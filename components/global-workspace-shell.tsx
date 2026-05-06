@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import { ArrowUp } from "lucide-react"
 import PMSidebar from "@/app/pm/components/PMSidebar"
+import StudentSidebar from "@/app/student/components/StudentSidebar"
 import { OmniLogo } from "@/components/omni-logo"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -19,12 +20,13 @@ const SUGGESTIONS = [
 
 export default function GlobalWorkspaceShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  const isSherlockPage = pathname.startsWith("/analyse-profile") || pathname.startsWith("/interviews") || pathname.startsWith("/interview-pack") || pathname.startsWith("/chat") || pathname.startsWith("/job-brief") || pathname.startsWith("/pm") || pathname.startsWith("/settings")
+  const isStudentPage = pathname.startsWith("/student")
+  const isSherlockPage = pathname.startsWith("/analyse-profile") || pathname.startsWith("/interviews") || pathname.startsWith("/interview-pack") || pathname.startsWith("/chat") || pathname.startsWith("/job-brief") || pathname.startsWith("/pm") || pathname.startsWith("/settings") || isStudentPage
 
   return (
     <div className="chat-surface pm-command-surface h-screen min-w-0 overflow-hidden bg-[var(--chat-bg)] text-[var(--chat-text)] font-sans [--pm-chart-grid:rgba(36,31,24,0.10)] [--pm-chart-axis:rgba(36,31,24,0.58)] [--pm-chart-muted:rgba(36,31,24,0.42)] [--pm-chart-cursor:rgba(36,31,24,0.05)] [--pm-tooltip-bg:rgba(255,250,242,0.96)] [--pm-tooltip-border:#ded2c2] [--pm-tooltip-text:#241f18] dark:[--pm-chart-grid:rgba(255,255,255,0.06)] dark:[--pm-chart-axis:rgba(255,255,255,0.45)] dark:[--pm-chart-muted:rgba(255,255,255,0.28)] dark:[--pm-chart-cursor:rgba(255,255,255,0.05)] dark:[--pm-tooltip-bg:rgba(0,0,0,0.80)] dark:[--pm-tooltip-border:rgba(255,255,255,0.10)] dark:[--pm-tooltip-text:#ffffff]">
       <div className="flex h-full min-w-0 overflow-hidden">
-        <PMSidebar />
+        {isStudentPage ? <StudentSidebar /> : <PMSidebar />}
         {!isSherlockPage && <AristotleSearchPanel />}
         <div className="flex h-full min-w-0 flex-1 overflow-auto [&>*]:min-w-0 [&>*]:flex-1">
           {children}
