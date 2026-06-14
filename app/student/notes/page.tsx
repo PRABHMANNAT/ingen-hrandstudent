@@ -782,8 +782,8 @@ export default function StudentNotesPage() {
       <section className="relative h-full min-w-0 flex-1 overflow-hidden">
         <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(36,31,24,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(36,31,24,0.035)_1px,transparent_1px)] bg-[size:38px_38px] dark:bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)]" />
 
-        <div className="relative h-full overflow-y-auto px-6 py-6">
-          <div className="mx-auto max-w-[1240px] pb-10">
+        <div className="relative h-full overflow-y-auto px-8 py-8">
+          <div className="mx-auto w-full max-w-[920px] pb-10">
             <ProfileToolbar
               savedState={savedState}
               profileStrength={profileStrength}
@@ -794,22 +794,19 @@ export default function StudentNotesPage() {
               onReset={resetProfile}
             />
 
-            <div className="mt-5 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,760px)_320px] 2xl:grid-cols-[minmax(0,820px)_350px]">
-              <div className="space-y-5">
-                <ProfileHeaderCard profile={profile} avatarSrc={avatarSrc} onAvatarChange={handleAvatarChange} />
-                <IntroVideoCard
-                  activeSlide={activeSlide}
-                  onPrevious={() => setVideoIndex((index) => (index === 0 ? INTRO_SLIDES.length - 1 : index - 1))}
-                  onNext={() => setVideoIndex((index) => (index + 1) % INTRO_SLIDES.length)}
-                />
-                <StatsRow />
-                <RoleFitCard profile={profile} />
-                <EvidenceBoxesSection boxes={profile.evidenceBoxes} />
-                <ExperienceSection experiences={profile.experiences} />
-                <VerifiedProofSection projects={profile.projects} />
-                <EndorsementsSection />
-              </div>
-
+            <div className="mt-5 flex flex-col gap-5">
+              <ProfileHeaderCard profile={profile} avatarSrc={avatarSrc} onAvatarChange={handleAvatarChange} />
+              <IntroVideoCard
+                activeSlide={activeSlide}
+                onPrevious={() => setVideoIndex((index) => (index === 0 ? INTRO_SLIDES.length - 1 : index - 1))}
+                onNext={() => setVideoIndex((index) => (index + 1) % INTRO_SLIDES.length)}
+              />
+              <StatsRow />
+              <RoleFitCard profile={profile} />
+              <EvidenceBoxesSection boxes={profile.evidenceBoxes} />
+              <ExperienceSection experiences={profile.experiences} />
+              <VerifiedProofSection projects={profile.projects} />
+              <EndorsementsSection />
               <RecruiterInsightsPanel profile={profile} profileStrength={profileStrength} />
             </div>
           </div>
@@ -833,7 +830,7 @@ function AristotlePanel({
   onQuickCommand: (value: string) => void
 }) {
   return (
-    <aside className="relative flex h-full w-[292px] shrink-0 flex-col border-r border-[#DED4C7]/70 bg-[#F5F1EA] px-5 py-6 dark:border-white/[0.06] dark:bg-[#0A0A0A] 2xl:w-[320px]">
+    <aside className="relative flex h-full w-[40%] min-w-[320px] max-w-[560px] shrink-0 flex-col border-r border-[#DED4C7]/70 bg-[#F5F1EA] px-7 py-8 dark:border-white/[0.06] dark:bg-[#0A0A0A]">
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#DED4C733_1px,transparent_1px),linear-gradient(to_bottom,#DED4C733_1px,transparent_1px)] bg-[size:30px_30px] opacity-30 dark:opacity-10" />
 
       <div className="relative">
@@ -1359,7 +1356,7 @@ function EndorsementsSection() {
 
 function RecruiterInsightsPanel({ profile, profileStrength }: { profile: ProfileState; profileStrength: number }) {
   return (
-    <aside className="relative space-y-4 xl:sticky xl:top-0 xl:self-start">
+    <aside className="relative space-y-4">
       <div className="space-y-4">
         <InsightCard title="Recruiter insights" icon={BarChart3}>
           <div className="space-y-3">
