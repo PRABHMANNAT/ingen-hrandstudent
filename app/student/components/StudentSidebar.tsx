@@ -3,16 +3,15 @@
 import React, { useEffect, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { BriefcaseBusiness, Library, Map, Moon, Sun, UserRound } from "lucide-react"
+import { BriefcaseBusiness, Library, Moon, Sun, UserRound } from "lucide-react"
 import { IngenLogo } from "@/components/ingen-logo"
 import { useAppTheme } from "@/components/theme/ThemeProvider"
 import { cn } from "@/lib/utils"
 import { themeClasses } from "@/lib/theme"
 
 const navItems = [
-  { label: "Roadmap", icon: Map, href: "/student", exact: true },
-  { label: "Jobs", icon: BriefcaseBusiness, href: "/student/jobs" },
-  { label: "Manage Profile", icon: UserRound, href: "/student/notes" },
+  { label: "Profile", icon: UserRound, href: "/student/notes" },
+  { label: "Find Job", icon: BriefcaseBusiness, href: "/student/jobs" },
   { label: "Collections", icon: Library, href: "/student/collections" },
 ]
 

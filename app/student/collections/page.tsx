@@ -597,7 +597,7 @@ function loadStoredItems(): CollectionItem[] {
         title: parsed.targetRole ? `${parsed.targetRole} Profile` : "Current Recruiter Profile",
         eyebrow: "Profile",
         savedAt: "Saved now",
-        summary: "Latest profile saved from Manage Profile",
+        summary: "Latest profile saved from Profile",
         description: parsed.tagline ?? "Recruiter-ready profile saved from Aristotle.",
         tags: (parsed.keywords ?? ["React", "TypeScript", "Python"]).slice(0, 4),
         meta: "Saved profile",
