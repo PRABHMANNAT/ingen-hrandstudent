@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
 import { isSupabaseConfigured } from "@/lib/supabase/config"
-import { getCurrentProfile } from "@/lib/profile/queries"
+import { getCurrentProfile, getRecentChat } from "@/lib/profile/queries"
 import ProfileWorkspace from "./profile-workspace"
 import ProfileUnconfigured from "./profile-unconfigured"
 
@@ -18,5 +18,6 @@ export default async function StudentNotesPage() {
     redirect("/student/login?next=/student/notes")
   }
 
-  return <ProfileWorkspace profile={profile} />
+  const chat = await getRecentChat()
+  return <ProfileWorkspace profile={profile} initialChat={chat} />
 }

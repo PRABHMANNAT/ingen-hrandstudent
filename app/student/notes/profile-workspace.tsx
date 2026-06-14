@@ -1,6 +1,7 @@
 "use client"
 
-import React, { useState, useTransition } from "react"
+import React, { useRef, useState, useTransition } from "react"
+import { useRouter } from "next/navigation"
 import {
   ArrowUp,
   BadgeCheck,
@@ -10,9 +11,11 @@ import {
   FileText,
   GraduationCap,
   HeartHandshake,
+  ImagePlus,
   LayoutGrid,
   Loader2,
   LogOut,
+  Paperclip,
   Pencil,
   Plus,
   Sparkles,
@@ -20,7 +23,8 @@ import {
   Trophy,
   X,
 } from "lucide-react"
-import type { FullProfile, ProofRow, SectionWithItems } from "@/lib/supabase/types"
+import type { ChatMessageRow, FullProfile, ProofRow, SectionWithItems } from "@/lib/supabase/types"
+import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 import {
   addItem,
@@ -31,6 +35,12 @@ import {
   updateHeader,
   updateItem,
 } from "./actions"
+
+const QUICK_COMMANDS = [
+  "Create an education section from my resume",
+  "Add my GitHub project github.com/...",
+  "Add these photos to my social work section",
+]
 
 const SECTION_PRESETS: { type: string; title: string }[] = [
   { type: "education", title: "Education" },
@@ -67,10 +77,16 @@ function initials(name: string) {
   )
 }
 
-export default function ProfileWorkspace({ profile }: { profile: FullProfile }) {
+export default function ProfileWorkspace({
+  profile,
+  initialChat,
+}: {
+  profile: FullProfile
+  initialChat: ChatMessageRow[]
+}) {
   return (
     <main className="flex h-full min-w-0 flex-1 overflow-hidden bg-[#F5F1EA] text-[#251F1A] dark:bg-[#050505] dark:text-white">
-      <AristotlePanel profileName={profile.full_name} />
+      <AristotlePanel profile={profile} initialChat={initialChat} />
 
       <section className="relative h-full min-w-0 flex-1 overflow-hidden">
         <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(36,31,24,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(36,31,24,0.035)_1px,transparent_1px)] bg-[size:38px_38px] dark:bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)]" />
@@ -335,6 +351,14 @@ function ItemRow({ item }: { item: SectionWithItems["items"][number] }) {
         <div className="min-w-0">
           {item.title && <p className="text-sm font-black text-[#251F1A] dark:text-white">{item.title}</p>}
           {item.body && <p className="mt-0.5 text-sm font-semibold leading-6 text-[#5C534B] dark:text-white/55">{item.body}</p>}
+          {Array.isArray((item.meta as { images?: string[] })?.images) && (item.meta as { images?: string[] }).images!.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {(item.meta as { images: string[] }).images.map((src) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img key={src} src={src} alt="" className="h-20 w-20 rounded-xl border border-[#DED4C7] object-cover dark:border-white/10" />
+              ))}
+            </div>
+          )}
           {item.proofs.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-1.5">
               {item.proofs.map((proof) => (
@@ -485,40 +509,240 @@ function EditField({
   )
 }
 
-// --- Aristotle panel (Phase 2 will make this drive AI edits) ----------------
-function AristotlePanel({ profileName }: { profileName: string }) {
+// --- Aristotle panel (real AI chat that edits the profile) ------------------
+type ChatTurn = { role: "user" | "assistant"; content: string; attachments?: { url: string; name: string; type: string }[] }
+type PendingAttachment = { url: string; name: string; type: string; uploading?: boolean }
+
+function AristotlePanel({ profile, initialChat }: { profile: FullProfile; initialChat: ChatMessageRow[] }) {
+  const router = useRouter()
+  const fileRef = useRef<HTMLInputElement>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const [messages, setMessages] = useState<ChatTurn[]>(
+    initialChat.map((m) => ({
+      role: m.role,
+      content: m.content,
+      attachments: (m.attachments as ChatTurn["attachments"]) ?? [],
+    })),
+  )
+  const [input, setInput] = useState("")
+  const [attachments, setAttachments] = useState<PendingAttachment[]>([])
+  const [sending, setSending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const hasHistory = messages.length > 0
+
+  function scrollToBottom() {
+    requestAnimationFrame(() => {
+      if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    })
+  }
+
+  async function handleFiles(files: FileList | null) {
+    if (!files || files.length === 0) return
+    setError(null)
+    const supabase = createClient()
+    for (const file of Array.from(files).slice(0, 6)) {
+      const placeholder: PendingAttachment = { url: "", name: file.name, type: file.type, uploading: true }
+      setAttachments((prev) => [...prev, placeholder])
+      const path = `${profile.id}/chat/${Date.now()}-${file.name.replace(/[^\w.\-]/g, "_")}`
+      const { error: upErr } = await supabase.storage.from("profile-media").upload(path, file, { upsert: true })
+      if (upErr) {
+        setError(`Upload failed: ${upErr.message}`)
+        setAttachments((prev) => prev.filter((a) => a !== placeholder))
+        continue
+      }
+      const { data } = supabase.storage.from("profile-media").getPublicUrl(path)
+      setAttachments((prev) => prev.map((a) => (a === placeholder ? { url: data.publicUrl, name: file.name, type: file.type } : a)))
+    }
+  }
+
+  async function send(text: string) {
+    const message = text.trim()
+    const ready = attachments.filter((a) => a.url && !a.uploading)
+    if ((!message && ready.length === 0) || sending) return
+
+    setSending(true)
+    setError(null)
+    const sentAttachments = ready.map(({ url, name, type }) => ({ url, name, type }))
+    setMessages((prev) => [...prev, { role: "user", content: message, attachments: sentAttachments }])
+    setInput("")
+    setAttachments([])
+    scrollToBottom()
+
+    try {
+      const res = await fetch("/api/student/aristotle", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message, attachments: sentAttachments }),
+      })
+      const data = await res.json()
+      const reply = data.reply ?? data.error ?? "Something went wrong."
+      setMessages((prev) => [...prev, { role: "assistant", content: reply }])
+      scrollToBottom()
+      if (data.applied > 0) router.refresh() // reload the profile to show new sections/items
+    } catch (err) {
+      setMessages((prev) => [...prev, { role: "assistant", content: "Network error — please try again." }])
+      setError(err instanceof Error ? err.message : "Network error")
+    } finally {
+      setSending(false)
+    }
+  }
+
   return (
     <aside className="relative flex h-full w-[40%] min-w-[320px] max-w-[560px] shrink-0 flex-col border-r border-[#DED4C7]/70 bg-[#F5F1EA] px-7 py-8 dark:border-white/[0.06] dark:bg-[#0A0A0A]">
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#DED4C733_1px,transparent_1px),linear-gradient(to_bottom,#DED4C733_1px,transparent_1px)] bg-[size:30px_30px] opacity-30 dark:opacity-10" />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,#DED4C733_1px,transparent_1px),linear-gradient(to_bottom,#DED4C733_1px,transparent_1px)] bg-[size:30px_30px] opacity-30 dark:opacity-10" />
 
-      <div className="relative">
+      <div className="relative shrink-0">
         <p className="text-[10px] font-black uppercase tracking-[0.34em] text-[#7C5CFF]">Aristotle</p>
-        <h1 className="mt-3 text-2xl font-black tracking-[-0.06em] text-[#251F1A] dark:text-white">
-          Hi {profileName?.split(" ")[0] || "there"} — let&apos;s build your profile.
+        <h1 className="mt-2 text-xl font-black tracking-[-0.05em] text-[#251F1A] dark:text-white">
+          Hi {profile.full_name?.split(" ")[0] || "there"} — let&apos;s build your profile.
         </h1>
-        <p className="mt-3 text-sm font-semibold leading-6 text-[#756B63] dark:text-white/50">
-          Use the controls on the right to add and edit sections now. AI-assisted editing — &ldquo;add my hackathon
-          certificates&rdquo;, &ldquo;create an education section from my resume&rdquo; — comes online in the next update.
-        </p>
       </div>
 
+      {/* Conversation */}
+      <div ref={scrollRef} className="relative mt-5 flex-1 space-y-3 overflow-y-auto pr-1">
+        {!hasHistory && (
+          <div className="space-y-3">
+            <p className="text-sm font-semibold leading-6 text-[#756B63] dark:text-white/50">
+              Tell me what to add — paste your resume, drop a GitHub link, attach event photos or certificates, and I&apos;ll
+              build the right section with proof.
+            </p>
+            <div className="flex flex-col gap-2">
+              {QUICK_COMMANDS.map((cmd) => (
+                <button
+                  key={cmd}
+                  type="button"
+                  disabled={sending}
+                  onClick={() => send(cmd)}
+                  className="rounded-2xl border border-[#DED4C7] bg-[#FFFDF8]/80 px-3 py-2 text-left text-[12px] font-bold text-[#756B63] transition hover:border-[#7C5CFF]/45 hover:text-[#6B4EF6] disabled:opacity-50 dark:border-white/10 dark:bg-white/[0.04] dark:text-white/55"
+                >
+                  {cmd}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {messages.map((m, i) => (
+          <div key={i} className={cn("flex", m.role === "user" ? "justify-end" : "justify-start")}>
+            <div
+              className={cn(
+                "max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm font-semibold leading-6",
+                m.role === "user"
+                  ? "bg-[#7C5CFF] text-white"
+                  : "border border-[#DED4C7] bg-[#FFFDF8] text-[#251F1A] dark:border-white/10 dark:bg-[#141414] dark:text-white",
+              )}
+            >
+              {m.content}
+              {m.attachments && m.attachments.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {m.attachments.map((a) =>
+                    a.type.startsWith("image/") ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img key={a.url} src={a.url} alt={a.name} className="h-12 w-12 rounded-lg object-cover" />
+                    ) : (
+                      <span key={a.url} className="rounded-lg bg-black/10 px-2 py-1 text-[10px] font-bold">{a.name}</span>
+                    ),
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+
+        {sending && (
+          <div className="flex justify-start">
+            <div className="inline-flex items-center gap-2 rounded-2xl border border-[#DED4C7] bg-[#FFFDF8] px-3.5 py-2.5 text-sm font-bold text-[#756B63] dark:border-white/10 dark:bg-[#141414] dark:text-white/55">
+              <Loader2 size={14} className="animate-spin text-[#7C5CFF]" /> Aristotle is working…
+            </div>
+          </div>
+        )}
+      </div>
+
+      {error && <p className="relative mt-2 shrink-0 text-xs font-bold text-red-600 dark:text-red-400">{error}</p>}
+
+      {/* Attachment previews */}
+      {attachments.length > 0 && (
+        <div className="relative mt-3 flex shrink-0 flex-wrap gap-2">
+          {attachments.map((a, i) => (
+            <div key={i} className="relative">
+              {a.type.startsWith("image/") && a.url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={a.url} alt={a.name} className="h-14 w-14 rounded-xl border border-[#DED4C7] object-cover dark:border-white/10" />
+              ) : (
+                <div className="flex h-14 w-14 items-center justify-center rounded-xl border border-[#DED4C7] bg-[#FFFDF8] text-[#756B63] dark:border-white/10 dark:bg-white/[0.04]">
+                  {a.uploading ? <Loader2 size={16} className="animate-spin" /> : <Paperclip size={16} />}
+                </div>
+              )}
+              {a.uploading && a.type.startsWith("image/") && (
+                <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/30">
+                  <Loader2 size={16} className="animate-spin text-white" />
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => setAttachments((prev) => prev.filter((_, idx) => idx !== i))}
+                className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#251F1A] text-white shadow"
+                aria-label="Remove attachment"
+              >
+                <X size={11} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Composer */}
       <form
-        onSubmit={(e) => e.preventDefault()}
-        className="relative mt-auto"
+        onSubmit={(e) => {
+          e.preventDefault()
+          void send(input)
+        }}
+        className="relative mt-3 shrink-0"
       >
-        <div className="relative rounded-[22px] border border-[#DED4C7] bg-[#FFFDF8] opacity-60 shadow-[0_14px_36px_rgba(42,37,32,0.08)] dark:border-white/10 dark:bg-[#141414]">
+        <div className="relative rounded-[22px] border border-[#DED4C7] bg-[#FFFDF8] shadow-[0_14px_36px_rgba(42,37,32,0.08)] focus-within:border-[#7C5CFF]/50 dark:border-white/10 dark:bg-[#141414]">
           <input
-            disabled
-            placeholder="Aristotle chat — coming next"
-            className="h-[58px] w-full rounded-[22px] bg-transparent px-4 pr-28 text-sm font-semibold text-[#251F1A] outline-none placeholder:text-[#B7AEA5] dark:text-white"
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            multiple
+            hidden
+            onChange={(e) => {
+              void handleFiles(e.target.files)
+              e.target.value = ""
+            }}
           />
-          <button
-            type="button"
-            disabled
-            className="absolute right-2 top-1/2 inline-flex h-10 -translate-y-1/2 items-center gap-1.5 rounded-full bg-[#DED4C7] px-3 text-[10px] font-black uppercase tracking-[0.12em] text-white dark:bg-white/10"
-          >
-            Soon <ArrowUp size={14} />
-          </button>
+          <textarea
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault()
+                void send(input)
+              }
+            }}
+            disabled={sending}
+            rows={2}
+            placeholder="Ask Aristotle to add or update a section…"
+            className="block w-full resize-none rounded-t-[22px] bg-transparent px-4 pt-3 text-sm font-semibold text-[#251F1A] outline-none placeholder:text-[#B7AEA5] disabled:opacity-50 dark:text-white dark:placeholder:text-white/30"
+          />
+          <div className="flex items-center justify-between px-2.5 pb-2.5">
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              disabled={sending}
+              className="inline-flex items-center gap-1.5 rounded-full px-2 py-1.5 text-[11px] font-black text-[#756B63] transition hover:bg-[#241f18]/5 hover:text-[#6B4EF6] disabled:opacity-50 dark:text-white/45 dark:hover:bg-white/5"
+            >
+              <ImagePlus size={15} /> Attach
+            </button>
+            <button
+              type="submit"
+              disabled={sending || (!input.trim() && attachments.filter((a) => a.url).length === 0)}
+              className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[#7C5CFF] px-3.5 text-[11px] font-black uppercase tracking-[0.1em] text-white shadow-[0_10px_22px_rgba(124,92,255,0.28)] transition hover:bg-[#684AF0] disabled:bg-[#DED4C7] disabled:shadow-none dark:disabled:bg-white/10"
+            >
+              {sending ? <Loader2 size={13} className="animate-spin" /> : <>Send <ArrowUp size={13} /></>}
+            </button>
+          </div>
         </div>
       </form>
     </aside>

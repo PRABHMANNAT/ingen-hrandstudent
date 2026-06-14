@@ -1,6 +1,22 @@
 import "server-only"
 import { createClient } from "@/lib/supabase/server"
-import type { FullProfile, ProfileRow, SectionWithItems } from "@/lib/supabase/types"
+import type { ChatMessageRow, FullProfile, ProfileRow, SectionWithItems } from "@/lib/supabase/types"
+
+// Recent Aristotle chat messages for the signed-in user, oldest first.
+export async function getRecentChat(limit = 30): Promise<ChatMessageRow[]> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return []
+  const { data } = await supabase
+    .from("chat_messages")
+    .select("*")
+    .eq("profile_id", user.id)
+    .order("created_at", { ascending: false })
+    .limit(limit)
+  return ((data as ChatMessageRow[]) ?? []).slice().reverse()
+}
 
 // Loads the signed-in user's full profile (header + sections + items + proofs).
 // Returns null if not signed in. Creates a bare profile row on the fly if the
