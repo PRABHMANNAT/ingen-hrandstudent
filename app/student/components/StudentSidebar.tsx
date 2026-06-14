@@ -32,16 +32,16 @@ export default function StudentSidebar() {
   return (
     <div
       className={cn(
-        "flex flex-col py-4 bg-[#f8f3ea] border border-[#ded2c2] shrink-0 z-50 transition-all duration-300 ease-out group/sidebar m-4 h-fit my-auto rounded-[2.5rem] shadow-2xl relative gap-2 dark:bg-[#121212] dark:border-white/10",
+        "flex flex-col py-3 bg-[#f8f3ea] border border-[#ded2c2] shrink-0 z-50 transition-all duration-300 ease-out group/sidebar ml-2 my-auto h-fit rounded-3xl shadow-lg relative gap-1.5 dark:bg-[#121212] dark:border-white/10",
         `${t.sidebar} backdrop-blur-xl`,
-        isExpanded ? "w-64 px-4 items-start" : "w-[68px] items-center"
+        isExpanded ? "w-56 px-3 items-start" : "w-[52px] items-center"
       )}
       onMouseEnter={() => setIsExpanded(true)}
       onMouseLeave={() => setIsExpanded(false)}
     >
       <div className={cn("flex items-center px-0 w-full", isExpanded ? "justify-start px-2 gap-3" : "justify-center")}>
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-300 cursor-pointer shrink-0 hover:bg-[#241f18]/5 dark:hover:bg-white/5">
-          <IngenLogo size={32} className="w-8 h-8 rounded-lg" />
+        <div className="w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-300 cursor-pointer shrink-0 hover:bg-[#241f18]/5 dark:hover:bg-white/5">
+          <IngenLogo size={26} className="w-[26px] h-[26px] rounded-md" />
         </div>
         <div
           className={cn(
@@ -65,7 +65,7 @@ export default function StudentSidebar() {
               key={item.href}
               href={item.href}
               className={cn(
-                "h-10 flex items-center transition-all duration-200 relative group w-full",
+                "h-9 flex items-center transition-all duration-200 relative group w-full",
                 isExpanded ? "justify-start px-3" : "justify-center"
               )}
             >
@@ -80,13 +80,13 @@ export default function StudentSidebar() {
 
               <div
                 className={cn(
-                  "relative flex items-center justify-center w-10 h-10 rounded-xl transition-all duration-200",
+                  "relative flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200",
                   isActive
                     ? "text-[#7C5CFF]"
                     : "text-[#241f18]/45 group-hover:text-[#241f18] group-hover:bg-[#241f18]/5 dark:text-white/40 dark:group-hover:text-white dark:group-hover:bg-white/5"
                 )}
               >
-                <item.icon className="w-5 h-5" strokeWidth={isActive ? 2.5 : 2} />
+                <item.icon className="w-[18px] h-[18px]" strokeWidth={isActive ? 2.5 : 2} />
               </div>
 
               <span
@@ -102,7 +102,7 @@ export default function StudentSidebar() {
               </span>
 
               {!isExpanded && (
-                <div className="absolute left-16 px-3 py-1.5 bg-[#fffaf2] border border-[#ded2c2] rounded-lg text-xs font-medium text-[#241f18] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-[60] shadow-xl dark:bg-[#1A1A1A] dark:border-white/10 dark:text-white">
+                <div className="absolute left-14 px-2.5 py-1 bg-[#fffaf2] border border-[#ded2c2] rounded-md text-[11px] font-medium text-[#241f18] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-[60] shadow-md dark:bg-[#1A1A1A] dark:border-white/10 dark:text-white">
                   {item.label}
                 </div>
               )}
@@ -122,8 +122,8 @@ export default function StudentSidebar() {
             isExpanded ? "justify-start px-2" : "justify-center"
           )}
         >
-          <div className="relative flex items-center justify-center w-10 h-10 rounded-xl text-[#241f18]/45 group-hover:text-[#241f18] group-hover:bg-[#241f18]/5 transition-all dark:text-white/40 dark:group-hover:text-white dark:group-hover:bg-white/5">
-            <ThemeIcon className="w-5 h-5" strokeWidth={2} />
+          <div className="relative flex items-center justify-center w-9 h-9 rounded-lg text-[#241f18]/45 group-hover:text-[#241f18] group-hover:bg-[#241f18]/5 transition-all dark:text-white/40 dark:group-hover:text-white dark:group-hover:bg-white/5">
+            <ThemeIcon className="w-[18px] h-[18px]" strokeWidth={2} />
           </div>
           <span
             className={cn(
@@ -134,7 +134,7 @@ export default function StudentSidebar() {
             {isDark ? "Light mode" : "Dark mode"}
           </span>
           {!isExpanded && (
-            <div className="absolute left-16 px-3 py-1.5 bg-[#fffaf2] border border-[#ded2c2] rounded-lg text-xs font-medium text-[#241f18] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-[60] shadow-xl dark:bg-[#1A1A1A] dark:border-white/10 dark:text-white">
+            <div className="absolute left-14 px-2.5 py-1 bg-[#fffaf2] border border-[#ded2c2] rounded-md text-[11px] font-medium text-[#241f18] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-[60] shadow-md dark:bg-[#1A1A1A] dark:border-white/10 dark:text-white">
               {themeLabel}
             </div>
           )}
