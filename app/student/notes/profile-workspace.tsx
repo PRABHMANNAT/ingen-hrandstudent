@@ -1684,8 +1684,8 @@ function AristotlePanel({ profile, initialChat }: { profile: FullProfile; initia
         {!hasHistory && (
           <div className="space-y-3">
             <p className="text-[12px] font-normal leading-5 text-[#7B7269] dark:text-white/50">
-              Tell me what to add — paste your resume, drop a GitHub link, attach event photos or certificates, and I&apos;ll
-              build the right section with proof.
+              Tell me what to add — drop your resume (PDF/DOCX/MD/TXT), paste a GitHub link, attach event photos or
+              certificates, and I&apos;ll read them and build the right sections with proof.
             </p>
             <div className="flex flex-col gap-1.5">
               {QUICK_COMMANDS.map((cmd) => (
@@ -1744,31 +1744,39 @@ function AristotlePanel({ profile, initialChat }: { profile: FullProfile; initia
       {/* Attachment previews */}
       {attachments.length > 0 && (
         <div className="relative mt-2.5 flex shrink-0 flex-wrap gap-1.5">
-          {attachments.map((a, i) => (
-            <div key={i} className="relative">
-              {a.type.startsWith("image/") && a.url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={a.url} alt={a.name} className="h-11 w-11 rounded-lg border border-[#E8E0D2] object-cover dark:border-white/10" />
-              ) : (
-                <div className="flex h-11 w-11 items-center justify-center rounded-lg border border-[#E8E0D2] bg-white text-[#7B7269] dark:border-white/10 dark:bg-white/[0.04]">
-                  {a.uploading ? <Loader2 size={14} className="animate-spin" /> : <Paperclip size={14} />}
-                </div>
-              )}
-              {a.uploading && a.type.startsWith("image/") && (
-                <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/30">
-                  <Loader2 size={14} className="animate-spin text-white" />
-                </div>
-              )}
-              <button
-                type="button"
-                onClick={() => setAttachments((prev) => prev.filter((_, idx) => idx !== i))}
-                className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#1F1B17] text-white shadow"
-                aria-label="Remove attachment"
-              >
-                <X size={9} />
-              </button>
-            </div>
-          ))}
+          {attachments.map((a, i) => {
+            const isImg = a.type.startsWith("image/")
+            const shortName = a.name.length > 22 ? `${a.name.slice(0, 19)}…` : a.name
+            return (
+              <div key={i} className="relative">
+                {isImg && a.url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={a.url} alt={a.name} className="h-11 w-11 rounded-lg border border-[#E8E0D2] object-cover dark:border-white/10" />
+                ) : (
+                  <div
+                    title={a.name}
+                    className="flex h-11 max-w-[160px] items-center gap-1.5 rounded-lg border border-[#E8E0D2] bg-white px-2 text-[10px] font-semibold text-[#5C5249] dark:border-white/10 dark:bg-white/[0.04] dark:text-white/65"
+                  >
+                    {a.uploading ? <Loader2 size={14} className="animate-spin shrink-0" /> : <FileText size={14} className="shrink-0 text-[#7C5CFF]" />}
+                    <span className="truncate">{shortName}</span>
+                  </div>
+                )}
+                {a.uploading && isImg && (
+                  <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/30">
+                    <Loader2 size={14} className="animate-spin text-white" />
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setAttachments((prev) => prev.filter((_, idx) => idx !== i))}
+                  className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#1F1B17] text-white shadow"
+                  aria-label="Remove attachment"
+                >
+                  <X size={9} />
+                </button>
+              </div>
+            )
+          })}
         </div>
       )}
 
@@ -1784,7 +1792,7 @@ function AristotlePanel({ profile, initialChat }: { profile: FullProfile; initia
           <input
             ref={fileRef}
             type="file"
-            accept="image/*"
+            accept="image/*,.pdf,.docx,.md,.markdown,.txt,.rtf,.csv,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/markdown,text/plain,text/csv"
             multiple
             hidden
             onChange={(e) => {
@@ -1813,7 +1821,7 @@ function AristotlePanel({ profile, initialChat }: { profile: FullProfile; initia
               disabled={sending}
               className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[10px] font-semibold text-[#7B7269] transition hover:bg-[#1F1B17]/5 hover:text-[#6B4EF6] disabled:opacity-50 dark:text-white/45 dark:hover:bg-white/5"
             >
-              <ImagePlus size={13} /> Attach
+              <Paperclip size={13} /> Attach (image, PDF, DOCX, MD, TXT)
             </button>
             <button
               type="submit"
