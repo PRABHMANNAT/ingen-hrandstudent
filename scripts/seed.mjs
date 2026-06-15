@@ -362,6 +362,7 @@ const USERS = [
         "Software engineer based in Sydney with experience spanning full-stack development, cloud infrastructure, microservices, DevOps, and modern web technologies. Passionate about solving challenging engineering problems and building products that create meaningful impact at scale.",
       tags: ["TypeScript", "Node.js", "React", "Kubernetes", "AWS", "Azure", "Distributed Systems"],
       target_role: "Software Engineer",
+      avatar_url: "/photos/kumar/avatar.png",
     },
     sections: KUMAR_SECTIONS,
   },
@@ -424,6 +425,7 @@ async function resetProfile(userId, spec) {
     about: spec.profile.about ?? "",
     tags: spec.profile.tags ?? [],
     target_role: spec.profile.target_role ?? "",
+    avatar_url: spec.profile.avatar_url ?? null,
   })
 
   // Wipe + re-create sections for a clean demo state.
