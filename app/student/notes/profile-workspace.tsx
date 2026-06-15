@@ -404,7 +404,7 @@ function AvatarUploader({ profile }: { profile: FullProfile }) {
         onClick={() => fileRef.current?.click()}
         disabled={uploading}
         title={profile.avatar_url ? "Change photo" : "Upload a photo"}
-        className="group/avatar relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-[#7C5CFF] to-[#6B4EF6] text-lg font-bold text-white shadow-sm ring-offset-2 transition hover:ring-2 hover:ring-[#7C5CFF]/40 disabled:opacity-60"
+        className="group/avatar relative flex w-24 aspect-[4/5] shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-[#7C5CFF] to-[#6B4EF6] text-lg font-bold text-white shadow-sm ring-offset-2 transition hover:ring-2 hover:ring-[#7C5CFF]/40 disabled:opacity-60"
       >
         {profile.avatar_url ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -1605,6 +1605,8 @@ function AristotlePanel({ profile, initialChat }: { profile: FullProfile; initia
   const [attachments, setAttachments] = useState<PendingAttachment[]>([])
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [editingIdx, setEditingIdx] = useState<number | null>(null)
+  const [editText, setEditText] = useState("")
 
   const hasHistory = messages.length > 0
 
@@ -1665,6 +1667,15 @@ function AristotlePanel({ profile, initialChat }: { profile: FullProfile; initia
     }
   }
 
+  async function sendEdit(idx: number, newText: string) {
+    const trimmed = newText.trim()
+    if (!trimmed || sending) return
+    setMessages((prev) => prev.slice(0, idx))
+    setEditingIdx(null)
+    setEditText("")
+    await send(trimmed)
+  }
+
   return (
     <aside className="relative flex h-full w-[34%] min-w-[300px] max-w-[440px] shrink-0 flex-col border-r border-[#E8E0D2] bg-[#FAF7F2] px-5 py-5 dark:border-white/[0.06] dark:bg-[#0A0A0A]">
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,rgba(232,224,210,0.25)_1px,transparent_1px),linear-gradient(to_bottom,rgba(232,224,210,0.25)_1px,transparent_1px)] bg-[size:28px_28px] dark:opacity-10" />
@@ -1704,29 +1715,72 @@ function AristotlePanel({ profile, initialChat }: { profile: FullProfile; initia
         )}
 
         {messages.map((m, i) => (
-          <div key={i} className={cn("flex", m.role === "user" ? "justify-end" : "justify-start")}>
-            <div
-              className={cn(
-                "max-w-[88%] rounded-2xl px-3 py-2 text-[12px] font-normal leading-5",
-                m.role === "user"
-                  ? "bg-[#7C5CFF] text-white shadow-sm"
-                  : "border border-[#E8E0D2] bg-white text-[#1F1B17] dark:border-white/10 dark:bg-[#141414] dark:text-white",
-              )}
-            >
-              {m.content}
-              {m.attachments && m.attachments.length > 0 && (
-                <div className="mt-1.5 flex flex-wrap gap-1">
-                  {m.attachments.map((a) =>
-                    a.type.startsWith("image/") ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img key={a.url} src={a.url} alt={a.name} className="h-10 w-10 rounded-md object-cover" />
-                    ) : (
-                      <span key={a.url} className="rounded-md bg-black/10 px-1.5 py-0.5 text-[9px] font-semibold">{a.name}</span>
-                    ),
-                  )}
+          <div key={i} className={cn("group/msg flex items-end gap-1", m.role === "user" ? "justify-end" : "justify-start")}>
+            {m.role === "user" && editingIdx !== i && (
+              <button
+                type="button"
+                onClick={() => { setEditingIdx(i); setEditText(m.content) }}
+                title="Edit message"
+                className="mb-1 shrink-0 rounded-md p-1 text-[#A89D91] opacity-0 transition hover:bg-[#1F1B17]/5 hover:text-[#6B4EF6] group-hover/msg:opacity-100 dark:text-white/30 dark:hover:bg-white/5 dark:hover:text-[#C9BEFF]"
+              >
+                <Pencil size={11} />
+              </button>
+            )}
+            {editingIdx === i ? (
+              <div className="w-full max-w-[92%]">
+                <textarea
+                  value={editText}
+                  autoFocus
+                  rows={3}
+                  onChange={(e) => setEditText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void sendEdit(i, editText) }
+                    if (e.key === "Escape") { setEditingIdx(null); setEditText("") }
+                  }}
+                  className="w-full resize-none rounded-xl border border-[#7C5CFF]/40 bg-white px-3 py-2 text-[12px] font-normal text-[#1F1B17] outline-none focus:border-[#7C5CFF]/70 focus:ring-2 focus:ring-[#7C5CFF]/10 dark:bg-[#141414] dark:text-white"
+                />
+                <div className="mt-1.5 flex justify-end gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => { setEditingIdx(null); setEditText("") }}
+                    className="rounded-md px-2.5 py-1 text-[10px] font-semibold text-[#7B7269] transition hover:bg-[#1F1B17]/5 dark:text-white/50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void sendEdit(i, editText)}
+                    disabled={!editText.trim() || sending}
+                    className="rounded-md bg-[#7C5CFF] px-2.5 py-1 text-[10px] font-semibold text-white shadow-sm transition hover:bg-[#684AF0] disabled:opacity-50"
+                  >
+                    Send
+                  </button>
                 </div>
-              )}
-            </div>
+              </div>
+            ) : (
+              <div
+                className={cn(
+                  "max-w-[88%] rounded-2xl px-3 py-2 text-[12px] font-normal leading-5",
+                  m.role === "user"
+                    ? "bg-[#7C5CFF] text-white shadow-sm"
+                    : "border border-[#E8E0D2] bg-white text-[#1F1B17] dark:border-white/10 dark:bg-[#141414] dark:text-white",
+                )}
+              >
+                {m.content}
+                {m.attachments && m.attachments.length > 0 && (
+                  <div className="mt-1.5 flex flex-wrap gap-1">
+                    {m.attachments.map((a) =>
+                      a.type.startsWith("image/") ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img key={a.url} src={a.url} alt={a.name} className="h-10 w-10 rounded-md object-cover" />
+                      ) : (
+                        <span key={a.url} className="rounded-md bg-black/10 px-1.5 py-0.5 text-[9px] font-semibold">{a.name}</span>
+                      ),
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         ))}
 
