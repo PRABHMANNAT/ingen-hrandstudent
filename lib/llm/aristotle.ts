@@ -170,7 +170,7 @@ export async function planProfileEdits(
         model,
         response_format: { type: "json_object" },
         temperature: 0.2,
-        max_tokens: 3500,
+        max_completion_tokens: 3500,
         messages: [
           { role: "system", content: systemPrompt(profile, attachments, extracted) },
           { role: "user", content: userContent },
