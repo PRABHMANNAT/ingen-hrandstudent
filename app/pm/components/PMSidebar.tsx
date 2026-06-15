@@ -9,7 +9,7 @@ import { useAppTheme } from "@/components/theme/ThemeProvider"
 import { themeClasses } from "@/lib/theme"
 import {
     LayoutDashboard,
-    Users,
+    Search,
     Sun,
     Moon,
     FileText,
@@ -33,8 +33,8 @@ export default function PMSidebar() {
 
     const navItems = [
         { label: "Candidates", icon: LayoutDashboard, href: "/", exact: true },
+        { label: "Sherlock", icon: Search, href: "/analyse-profile" },
         { label: "Job Brief", icon: FileText, href: "/job-brief" },
-        { label: "Sherlock", icon: Users, href: "/analyse-profile" },
     ]
 
     return (
