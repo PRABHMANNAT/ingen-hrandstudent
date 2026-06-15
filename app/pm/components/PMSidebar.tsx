@@ -36,9 +36,7 @@ export default function PMSidebar() {
 
     const navItems = [
         { label: "Candidates", icon: LayoutDashboard, href: "/", exact: true },
-        { label: "Command Center", icon: Brain, href: "/pm", exact: true },
         { label: "Job Brief", icon: FileText, href: "/job-brief" },
-        { label: "Search", icon: Search, href: "/chat" },
         { label: "Analyse Profile", icon: Users, href: "/analyse-profile" },
         { label: "Interviews", icon: Users, href: "/interviews" },
     ]
