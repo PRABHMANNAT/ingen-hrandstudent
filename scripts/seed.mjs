@@ -55,6 +55,7 @@ function studentSections({
   leadership = [],
   awards = [],
   conferences = [],
+  gallery = [],
 } = {}) {
   return [
     { type: "education", title: "Education", items: education },
@@ -65,6 +66,7 @@ function studentSections({
     { type: "social-work", title: "Leadership & Community", items: leadership },
     { type: "hackathons", title: "Awards & Achievements", items: awards },
     { type: "certifications", title: "Conferences & Events", items: conferences },
+    { type: "gallery", title: "Events & Gallery", items: gallery },
   ].filter((s) => s.items.length > 0)
 }
 
@@ -259,6 +261,58 @@ const KUMAR_SECTIONS = studentSections({
       body:
         "Participated in cloud-native and Kubernetes sessions. Key learnings: cloud-native architecture, Kubernetes best practices, platform engineering, and AI infrastructure trends.",
       meta: { event: "Civo Navigate", domain: "civo.com", date: "2024", location: "London, UK" },
+    },
+  ],
+  gallery: [
+    {
+      title: "Civo Navigate · Cloud-Native Conference",
+      body: "Engaging with the global cloud-native community — Kubernetes, platform engineering, and AI infrastructure tracks.",
+      meta: {
+        event: "Civo Navigate",
+        domain: "civo.com",
+        date: "2024",
+        location: "London, UK",
+        images: [
+          "/photos/kumar/01.jpeg",
+          "/photos/kumar/02.jpeg",
+          "/photos/kumar/03.jpeg",
+          "/photos/kumar/04.jpeg",
+          "/photos/kumar/05.jpeg",
+        ],
+      },
+    },
+    {
+      title: "Inter-College Hackathon · Organizing Team",
+      body: "Coordinated a 24-hour hackathon with 500+ participants — sponsors, judges, volunteer teams, and technical mentorship.",
+      meta: {
+        event: "Inter-College Hackathon",
+        date: "2023",
+        location: "Mysuru, India",
+        images: [
+          "/photos/kumar/06.jpeg",
+          "/photos/kumar/07.jpeg",
+          "/photos/kumar/08.jpeg",
+          "/photos/kumar/09.jpeg",
+          "/photos/kumar/10.jpeg",
+        ],
+      },
+    },
+    {
+      title: "ACES & Clusteroids Engineering Clubs",
+      body: "Leading workshops, mentoring junior developers, and building partnerships with industry professionals as President of the engineering clubs.",
+      meta: {
+        event: "Engineering Clubs",
+        date: "2022 – 2024",
+        location: "Mysuru, India",
+        images: [
+          "/photos/kumar/11.jpeg",
+          "/photos/kumar/12.jpeg",
+          "/photos/kumar/13.jpeg",
+          "/photos/kumar/14.jpeg",
+          "/photos/kumar/15.jpeg",
+          "/photos/kumar/16.jpeg",
+        ],
+      },
     },
   ],
 })

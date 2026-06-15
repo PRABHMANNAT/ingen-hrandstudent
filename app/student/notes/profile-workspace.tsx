@@ -15,6 +15,7 @@ import {
   Globe,
   GraduationCap,
   HeartHandshake,
+  Image as ImageIcon,
   ImagePlus,
   LayoutGrid,
   Link2,
@@ -65,6 +66,7 @@ const SECTION_PRESETS: { type: string; title: string }[] = [
   { type: "social-work", title: "Social Work" },
   { type: "certifications", title: "Certifications" },
   { type: "skills", title: "Skills" },
+  { type: "gallery", title: "Events & Gallery" },
   { type: "custom", title: "Custom Section" },
 ]
 
@@ -77,6 +79,7 @@ const SECTION_ICON: Record<string, React.ComponentType<{ size?: number; classNam
   "social-work": HeartHandshake,
   certifications: BadgeCheck,
   skills: Sparkles,
+  gallery: ImageIcon,
   custom: LayoutGrid,
 }
 
@@ -887,6 +890,175 @@ function ItemEditCard({ item, form, setForm, onCancel }: { item: ItemRecord; for
   )
 }
 
+// --- Events & Gallery --------------------------------------------------------
+function GallerySection({ items }: { items: ItemRecord[] }) {
+  const allImages = items.flatMap((it) => {
+    const meta = (it.meta ?? {}) as ItemMeta & { images?: string[] }
+    return (meta.images ?? []).map((src) => ({ src, caption: it.title, item: it }))
+  })
+  const [lightboxIdx, setLightboxIdx] = useState<number | null>(null)
+  return (
+    <div className="space-y-5">
+      {items.map((item) => (
+        <GalleryGroup
+          key={item.id}
+          item={item}
+          onOpenLightbox={(src) => {
+            const idx = allImages.findIndex((g) => g.src === src)
+            if (idx >= 0) setLightboxIdx(idx)
+          }}
+        />
+      ))}
+      {lightboxIdx !== null && (
+        <LightboxViewer
+          images={allImages}
+          startIndex={lightboxIdx}
+          onClose={() => setLightboxIdx(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+function GalleryGroup({ item, onOpenLightbox }: { item: ItemRecord; onOpenLightbox: (src: string) => void }) {
+  const meta = (item.meta ?? {}) as ItemMeta & { images?: string[] }
+  const images = meta.images ?? []
+  const [pending, start] = useTransition()
+  const [editing, setEditing] = useState(false)
+  const [form, setForm] = useState({ title: item.title, body: item.body })
+  if (editing) return <ItemEditCard item={item} form={form} setForm={setForm} onCancel={() => setEditing(false)} />
+
+  const dateLabel = meta.date || dateRangeFromMeta(meta)
+
+  return (
+    <div className="group">
+      <div className="mb-2 flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-[13px] font-bold tracking-tight text-[#1F1B17] dark:text-white">{item.title}</h3>
+            {dateLabel && (
+              <span className="rounded-md bg-[#F3EFFF] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[#6B4EF6] dark:bg-[#7C5CFF]/10 dark:text-[#C9BEFF]">
+                {dateLabel}
+              </span>
+            )}
+            {meta.location && (
+              <span className="text-[10px] font-medium text-[#9A8F84] dark:text-white/40">· {meta.location}</span>
+            )}
+          </div>
+          {item.body && (
+            <p className="mt-1 text-[12px] font-normal leading-5 text-[#5C5249] dark:text-white/55">{item.body}</p>
+          )}
+        </div>
+        <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition group-hover:opacity-100">
+          <button type="button" onClick={() => { setForm({ title: item.title, body: item.body }); setEditing(true) }} className="rounded-md p-1 text-[#7B7269] hover:bg-[#1F1B17]/5 dark:text-white/40" aria-label="Edit event">
+            <Pencil size={11} />
+          </button>
+          <button type="button" onClick={() => start(() => void deleteItem(item.id))} disabled={pending} className="rounded-md p-1 text-[#7B7269] hover:text-red-600 disabled:opacity-50 dark:text-white/40" aria-label="Delete event">
+            <Trash2 size={11} />
+          </button>
+        </div>
+      </div>
+
+      {images.length > 0 && (
+        <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4 md:grid-cols-5">
+          {images.map((src, i) => (
+            <button
+              key={src + i}
+              type="button"
+              onClick={() => onOpenLightbox(src)}
+              className={cn(
+                "group/tile relative overflow-hidden rounded-lg border border-[#E8E0D2] bg-[#FAF7F2] transition hover:border-[#7C5CFF]/40 hover:shadow-[0_2px_10px_rgba(124,92,255,0.18)] dark:border-white/10 dark:bg-white/[0.04]",
+                // First image of each group is larger
+                i === 0 ? "col-span-2 row-span-2 aspect-square" : "aspect-square",
+              )}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={src}
+                alt={`${item.title} — ${i + 1}`}
+                loading="lazy"
+                className="h-full w-full object-cover transition-transform duration-300 group-hover/tile:scale-[1.04]"
+              />
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent opacity-0 transition group-hover/tile:opacity-100" />
+              <div className="pointer-events-none absolute bottom-1 left-1.5 right-1.5 flex items-center justify-between text-[9px] font-semibold text-white opacity-0 transition group-hover/tile:opacity-100">
+                <span className="rounded-sm bg-black/40 px-1 py-0.5 backdrop-blur-sm">{i + 1}/{images.length}</span>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+      <ProofsArea itemId={item.id} proofs={item.proofs} />
+    </div>
+  )
+}
+
+function LightboxViewer({
+  images,
+  startIndex,
+  onClose,
+}: {
+  images: { src: string; caption: string }[]
+  startIndex: number
+  onClose: () => void
+}) {
+  const [idx, setIdx] = useState(startIndex)
+  const current = images[idx]
+  React.useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose()
+      if (e.key === "ArrowRight") setIdx((i) => (i + 1) % images.length)
+      if (e.key === "ArrowLeft") setIdx((i) => (i - 1 + images.length) % images.length)
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [images.length, onClose])
+
+  if (!current) return null
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-[80] flex items-center justify-center bg-black/85 backdrop-blur-md"
+      onClick={onClose}
+    >
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); onClose() }}
+        className="absolute right-4 top-4 inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
+        aria-label="Close"
+      >
+        <X size={18} />
+      </button>
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); setIdx((i) => (i - 1 + images.length) % images.length) }}
+        className="absolute left-4 top-1/2 -translate-y-1/2 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
+        aria-label="Previous"
+      >
+        ‹
+      </button>
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); setIdx((i) => (i + 1) % images.length) }}
+        className="absolute right-4 top-1/2 -translate-y-1/2 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
+        aria-label="Next"
+      >
+        ›
+      </button>
+      <div className="relative flex max-h-[90vh] max-w-[92vw] flex-col items-center gap-3" onClick={(e) => e.stopPropagation()}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={current.src} alt={current.caption} className="max-h-[80vh] max-w-full rounded-xl object-contain shadow-2xl" />
+        <div className="flex items-center gap-3 text-[12px] font-medium text-white/80">
+          <span className="rounded-md bg-white/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider">
+            {idx + 1} / {images.length}
+          </span>
+          <span>{current.caption}</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function SectionBody({ section }: { section: SectionWithItems }) {
   if (section.type === "experience") {
     return (
@@ -917,6 +1089,9 @@ function SectionBody({ section }: { section: SectionWithItems }) {
   }
   if (section.type === "certifications") {
     return <HackathonTimeline items={section.items} />
+  }
+  if (section.type === "gallery") {
+    return <GallerySection items={section.items} />
   }
   return (
     <div className="space-y-2">
