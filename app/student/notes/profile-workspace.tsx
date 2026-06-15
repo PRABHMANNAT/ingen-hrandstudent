@@ -6,6 +6,7 @@ import {
   ArrowUp,
   BadgeCheck,
   Briefcase,
+  Camera,
   Check,
   ChevronDown,
   Code2,
@@ -45,6 +46,7 @@ import {
   deleteSection,
   signOutAction,
   syncLinkedInIdentityAction,
+  updateAvatar,
   updateHeader,
   updateItem,
   verifyAllProofs,
@@ -349,6 +351,108 @@ function Toolbar({ profile, linkedInIdentity }: { profile: FullProfile; linkedIn
   )
 }
 
+// --- Avatar uploader --------------------------------------------------------
+function AvatarUploader({ profile }: { profile: FullProfile }) {
+  const router = useRouter()
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState("")
+
+  async function handleFile(file: File) {
+    setError("")
+    if (!file.type.startsWith("image/")) {
+      setError("Pick an image file")
+      return
+    }
+    if (file.size > 6 * 1024 * 1024) {
+      setError("Image must be under 6MB")
+      return
+    }
+    setUploading(true)
+    try {
+      const supabase = createClient()
+      const ext = file.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "png"
+      const path = `${profile.id}/avatar/${Date.now()}.${ext}`
+      const { error: upErr } = await supabase.storage
+        .from("profile-media")
+        .upload(path, file, { upsert: true, contentType: file.type })
+      if (upErr) throw upErr
+      const { data } = supabase.storage.from("profile-media").getPublicUrl(path)
+      const res = await updateAvatar({ url: data.publicUrl })
+      if (!res.ok) throw new Error(res.error ?? "Could not save avatar")
+      router.refresh()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Upload failed")
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  async function clearAvatar() {
+    setError("")
+    setUploading(true)
+    const res = await updateAvatar({ url: null })
+    setUploading(false)
+    if (!res.ok) setError(res.error ?? "Could not remove avatar")
+    else router.refresh()
+  }
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => fileRef.current?.click()}
+        disabled={uploading}
+        title={profile.avatar_url ? "Change photo" : "Upload a photo"}
+        className="group/avatar relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-[#7C5CFF] to-[#6B4EF6] text-lg font-bold text-white shadow-sm ring-offset-2 transition hover:ring-2 hover:ring-[#7C5CFF]/40 disabled:opacity-60"
+      >
+        {profile.avatar_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={profile.avatar_url} alt={profile.full_name} className="h-full w-full object-cover" />
+        ) : (
+          <span>{initials(profile.full_name)}</span>
+        )}
+        <span
+          className={cn(
+            "absolute inset-0 flex flex-col items-center justify-center gap-0.5 bg-black/55 text-[9px] font-semibold uppercase tracking-wider text-white transition",
+            uploading ? "opacity-100" : "opacity-0 group-hover/avatar:opacity-100",
+          )}
+        >
+          {uploading ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} />}
+          {!uploading && <span>{profile.avatar_url ? "Change" : "Upload"}</span>}
+        </span>
+      </button>
+      {profile.avatar_url && !uploading && (
+        <button
+          type="button"
+          onClick={clearAvatar}
+          title="Remove photo"
+          className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full border border-[#E8E0D2] bg-white text-[#7B7269] opacity-0 shadow-sm transition hover:text-red-600 group-hover/avatar:opacity-100 dark:border-white/10 dark:bg-[#141414] dark:text-white/50"
+          aria-label="Remove photo"
+        >
+          <X size={11} />
+        </button>
+      )}
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        hidden
+        onChange={(e) => {
+          const f = e.target.files?.[0]
+          if (f) void handleFile(f)
+          e.target.value = ""
+        }}
+      />
+      {error && (
+        <p className="absolute left-0 top-full mt-1 whitespace-nowrap text-[10px] font-medium text-red-600" role="alert">
+          {error}
+        </p>
+      )}
+    </div>
+  )
+}
+
 // --- Fixed header block -----------------------------------------------------
 function HeaderBlock({ profile }: { profile: FullProfile }) {
   const [editing, setEditing] = useState(false)
@@ -388,14 +492,7 @@ function HeaderBlock({ profile }: { profile: FullProfile }) {
   return (
     <section className="mt-4 overflow-hidden rounded-2xl border border-[#E8E0D2] bg-white p-5 shadow-[0_1px_2px_rgba(31,27,23,0.04)] dark:border-white/10 dark:bg-[#0E0E0E]">
       <div className="flex items-start gap-4">
-        <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-[#7C5CFF] to-[#6B4EF6] text-lg font-bold text-white shadow-sm">
-          {profile.avatar_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={profile.avatar_url} alt={profile.full_name} className="h-full w-full object-cover" />
-          ) : (
-            initials(profile.full_name)
-          )}
-        </div>
+        <AvatarUploader profile={profile} />
 
         <div className="min-w-0 flex-1">
           {!editing ? (

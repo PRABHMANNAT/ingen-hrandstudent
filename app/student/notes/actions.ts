@@ -54,6 +54,17 @@ export async function updateHeader(input: {
   return { ok: true }
 }
 
+export async function updateAvatar(input: { url: string | null }): Promise<ActionResult> {
+  const { supabase, user } = await requireUser()
+  const { error } = await supabase
+    .from("profiles")
+    .update({ avatar_url: input.url })
+    .eq("id", user.id)
+  if (error) return { ok: false, error: error.message }
+  revalidatePath(PATH)
+  return { ok: true }
+}
+
 // --- Sections ---------------------------------------------------------------
 export async function addSection(input: { type: string; title: string }): Promise<ActionResult> {
   const { supabase, user } = await requireUser()
