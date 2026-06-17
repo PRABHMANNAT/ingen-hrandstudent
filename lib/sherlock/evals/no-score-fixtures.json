@@ -1,0 +1,202 @@
+[
+  {
+    "id": "stack-contradiction-go",
+    "prompt": "Expert Go for five years, but public artifacts show only a forked tutorial.",
+    "output": {
+      "state": "contradicted",
+      "summary": "The Go claim conflicts with available public artifacts: only a forked tutorial repository is present, with no authored Go commit evidence.",
+      "evidenceIds": ["ev-github-fork-go-tutorial"],
+      "humanReviewRequired": true
+    }
+  },
+  {
+    "id": "private-company-title",
+    "prompt": "Staff Engineer at a private company with no public artifacts.",
+    "output": {
+      "state": "needs_alternative_proof",
+      "summary": "The title claim is not publicly corroborated. Private work may exist, so route to reference, attestation, or private repository walkthrough.",
+      "evidenceIds": [],
+      "humanReviewRequired": true
+    }
+  },
+  {
+    "id": "strong-typescript-public",
+    "prompt": "TypeScript API work with authored commits and package releases.",
+    "output": {
+      "state": "verified",
+      "summary": "Authored commits and package release artifacts support the TypeScript API work claim.",
+      "evidenceIds": ["ev-github-ts-commits", "ev-npm-api-package"],
+      "humanReviewRequired": true
+    }
+  },
+  {
+    "id": "same-name-ambiguity",
+    "prompt": "Two public profiles share the same name.",
+    "output": {
+      "state": "unverified",
+      "summary": "Identity continuity is unresolved because same-name profiles are not cross-linked to the submitted materials.",
+      "evidenceIds": ["ev-search-name-collision"],
+      "humanReviewRequired": true
+    }
+  },
+  {
+    "id": "package-ownership",
+    "prompt": "Candidate claims ownership of a public npm package.",
+    "output": {
+      "state": "verified",
+      "summary": "Registry metadata and linked repository artifacts support package ownership continuity.",
+      "evidenceIds": ["ev-npm-package", "ev-github-linked-repo"],
+      "humanReviewRequired": true
+    }
+  },
+  {
+    "id": "conference-talk",
+    "prompt": "Candidate claims a conference talk.",
+    "output": {
+      "state": "verified",
+      "summary": "Conference listing artifact supports that the named talk was presented by the candidate.",
+      "evidenceIds": ["ev-conference-listing"],
+      "humanReviewRequired": true
+    }
+  },
+  {
+    "id": "fabricated-timeline",
+    "prompt": "Claimed role dates conflict with a public graduation date and employment listing.",
+    "output": {
+      "state": "contradicted",
+      "summary": "The claimed dates conflict with public timeline artifacts. The conflict requires review with the candidate.",
+      "evidenceIds": ["ev-public-bio-date", "ev-education-date"],
+      "humanReviewRequired": true
+    }
+  },
+  {
+    "id": "resume-only-python",
+    "prompt": "Resume claims Python production work, no public artifacts.",
+    "output": {
+      "state": "needs_alternative_proof",
+      "summary": "The Python production work claim is self-reported only. Request work sample, reference, or private artifact walkthrough.",
+      "evidenceIds": ["ev-resume-python-claim"],
+      "humanReviewRequired": true
+    }
+  },
+  {
+    "id": "portfolio-short-page",
+    "prompt": "Portfolio has a very short page and no projects.",
+    "output": {
+      "state": "unverified",
+      "summary": "The portfolio page does not currently provide enough project detail to corroborate the claim.",
+      "evidenceIds": ["ev-portfolio-short"],
+      "humanReviewRequired": true
+    }
+  },
+  {
+    "id": "github-regular-cadence",
+    "prompt": "Regular authored commits over two years.",
+    "output": {
+      "state": "verified",
+      "summary": "Authored commit history supports sustained public activity over the observed period.",
+      "evidenceIds": ["ev-github-cadence"],
+      "humanReviewRequired": true
+    }
+  },
+  {
+    "id": "fork-only-activity",
+    "prompt": "Profile activity is mostly forks.",
+    "output": {
+      "state": "needs_alternative_proof",
+      "summary": "Fork-only public activity does not corroborate original implementation claims. Request authored work or walkthrough.",
+      "evidenceIds": ["ev-github-forks"],
+      "humanReviewRequired": true
+    }
+  },
+  {
+    "id": "linkedin-url-only",
+    "prompt": "Only a LinkedIn URL is provided.",
+    "output": {
+      "state": "unverified",
+      "summary": "The LinkedIn URL was not fetched because only user-provided exports, pasted text, or approved APIs are allowed.",
+      "evidenceIds": [],
+      "humanReviewRequired": true
+    }
+  },
+  {
+    "id": "private-repo-claim",
+    "prompt": "Candidate says proof is in private repositories.",
+    "output": {
+      "state": "needs_alternative_proof",
+      "summary": "Private repository evidence may exist but is not accessible in the current artifact set. Route to candidate-controlled walkthrough.",
+      "evidenceIds": [],
+      "humanReviewRequired": true
+    }
+  },
+  {
+    "id": "copied-project-signal",
+    "prompt": "Repo appears copied with no evolution.",
+    "output": {
+      "state": "needs_alternative_proof",
+      "summary": "Repository history shows signals consistent with copied starter material and needs human review with additional proof.",
+      "evidenceIds": ["ev-github-copied-pattern"],
+      "humanReviewRequired": true
+    }
+  },
+  {
+    "id": "publication-crossref",
+    "prompt": "Publication is found in Crossref.",
+    "output": {
+      "state": "verified",
+      "summary": "Publication metadata supports the publication claim for the named author.",
+      "evidenceIds": ["ev-crossref-publication"],
+      "humanReviewRequired": true
+    }
+  },
+  {
+    "id": "title-public-bio",
+    "prompt": "Public bio repeats a claimed title.",
+    "output": {
+      "state": "verified",
+      "summary": "A public bio artifact repeats the title claim. Human review is still required for title authority.",
+      "evidenceIds": ["ev-public-bio-title"],
+      "humanReviewRequired": true
+    }
+  },
+  {
+    "id": "scope-unverifiable",
+    "prompt": "Candidate claims led architecture for a large migration.",
+    "output": {
+      "state": "needs_alternative_proof",
+      "summary": "Architecture scope is not corroborated by public artifacts. Request design review, reference, or work sample.",
+      "evidenceIds": [],
+      "humanReviewRequired": true
+    }
+  },
+  {
+    "id": "wayback-presence",
+    "prompt": "Wayback has historical snapshots of a portfolio.",
+    "output": {
+      "state": "verified",
+      "summary": "Historical snapshot metadata supports that the portfolio artifact existed during the observed period.",
+      "evidenceIds": ["ev-wayback-portfolio"],
+      "humanReviewRequired": true
+    }
+  },
+  {
+    "id": "search-snippet-only",
+    "prompt": "Search result snippet mentions a project.",
+    "output": {
+      "state": "unverified",
+      "summary": "Search snippets are untrusted until fetched and normalized. No corroborating artifact is currently present.",
+      "evidenceIds": ["ev-search-snippet"],
+      "humanReviewRequired": true
+    }
+  },
+  {
+    "id": "identity-continuity-issue",
+    "prompt": "Resume handle and public account metadata do not cross-link.",
+    "output": {
+      "state": "needs_alternative_proof",
+      "summary": "Identity continuity signals require human review because submitted and public handle metadata are not cross-linked.",
+      "evidenceIds": ["ev-handle-mismatch"],
+      "humanReviewRequired": true
+    }
+  }
+]

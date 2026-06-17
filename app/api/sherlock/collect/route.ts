@@ -3,6 +3,7 @@ import { z } from "zod"
 import { collectSherlockSources } from "@/lib/sherlock/collectors"
 import { sherlockClaimSchema } from "@/lib/sherlock/schemas"
 import { getSherlockPersistenceContext, writeSherlockAudit } from "@/lib/sherlock/server-store"
+import { checkCollectorRateLimit, logCollectorEvent } from "@/lib/sherlock/collector-utils"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -12,6 +13,8 @@ const collectRequestSchema = z.object({
   claims: z.array(sherlockClaimSchema).default([]),
   urls: z.array(z.string()).default([]),
   enableSearch: z.boolean().optional(),
+  async: z.boolean().optional(),
+  maxSyncCollectors: z.number().int().min(0).max(12).optional(),
 })
 
 export async function POST(request: Request) {
@@ -20,8 +23,29 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Invalid Sherlock collection payload" }, { status: 400 })
   }
 
-  const result = await collectSherlockSources(parsed.data)
   const persistence = await getSherlockPersistenceContext()
+  const rateLimitKey = buildRateLimitKey(request, parsed.data.sessionId, persistence.available ? persistence.userId : undefined)
+  const rateLimit = checkCollectorRateLimit(rateLimitKey, 8)
+  if (!rateLimit.ok) {
+    logCollectorEvent("warn", "api_collect_rate_limited", {
+      rateLimitKey,
+      retryAfterMs: rateLimit.retryAfterMs,
+      sessionId: parsed.data.sessionId,
+    })
+    return NextResponse.json(
+      {
+        ok: false,
+        error: `Collection rate limit reached. Retry after ${Math.ceil(rateLimit.retryAfterMs / 1000)}s.`,
+        retryAfterMs: rateLimit.retryAfterMs,
+      },
+      { status: 429 },
+    )
+  }
+
+  const result = await collectSherlockSources({
+    ...parsed.data,
+    sessionId: parsed.data.sessionId,
+  })
 
   if (persistence.available && parsed.data.sessionId) {
     await writeSherlockAudit(persistence.supabase, {
@@ -33,6 +57,7 @@ export async function POST(request: Request) {
         evidenceCount: result.evidence.length,
         statuses: result.statuses,
         warnings: result.warnings,
+        backgroundJob: result.backgroundJob,
       },
     })
   }
@@ -43,4 +68,10 @@ export async function POST(request: Request) {
     persistedAudit: persistence.available && Boolean(parsed.data.sessionId),
     fallback: persistence.available ? null : "localOnly",
   })
+}
+
+function buildRateLimitKey(request: Request, sessionId?: string, userId?: string) {
+  const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
+  const ip = forwarded || request.headers.get("x-real-ip") || "unknown"
+  return `sherlock-collect:${userId ?? sessionId ?? ip}`
 }

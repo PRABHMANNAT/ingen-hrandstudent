@@ -8,14 +8,18 @@ import {
   BadgeCheck,
   BookmarkCheck,
   BriefcaseBusiness,
+  Download,
   Layers3,
   Map as MapIcon,
   SearchCheck,
   Sparkles,
   Star,
+  Trash2,
   UserRound,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { buildSherlockExportPackage } from "@/lib/sherlock/compliance"
+import type { SherlockArtifactEnvelope } from "@/lib/sherlock/types"
 
 type CollectionKind = "profile" | "job" | "roadmap" | "sherlock_report"
 type FilterId = "all" | "profile" | "job" | "roadmap" | "sherlock_report"
@@ -42,6 +46,8 @@ type CollectionItem = {
   status?: string
   lastOpened?: string
   highlight?: string
+  sourceReportId?: string
+  artifact?: SherlockArtifactEnvelope
 }
 
 const mediaUrl = (name: string) => `/api/student-media?name=${encodeURIComponent(name)}`
@@ -249,6 +255,33 @@ export default function StudentCollectionsPage() {
     [allItems]
   )
 
+  async function handleDeleteSherlockReport(item: CollectionItem) {
+    if (item.kind !== "sherlock_report" || !item.sourceReportId) return
+    const confirmed = window.confirm(`Delete "${item.title}" from saved Sherlock reports?`)
+    if (!confirmed) return
+
+    removeStoredSherlockReport(item.sourceReportId)
+    setStoredItems(loadStoredItems())
+
+    if (isUuid(item.sourceReportId)) {
+      await fetch(`/api/sherlock/reports/${encodeURIComponent(item.sourceReportId)}`, { method: "DELETE" }).catch(() => undefined)
+    }
+  }
+
+  async function handleExportSherlockReport(item: CollectionItem) {
+    if (item.kind !== "sherlock_report") return
+    let artifact = item.artifact
+
+    if (!artifact && item.sourceReportId && isUuid(item.sourceReportId)) {
+      const response = await fetch(`/api/sherlock/reports/${encodeURIComponent(item.sourceReportId)}`).catch(() => null)
+      const result = response ? ((await response.json().catch(() => null)) as { localStorageItem?: { artifact?: SherlockArtifactEnvelope } } | null) : null
+      artifact = result?.localStorageItem?.artifact
+    }
+
+    if (!artifact) return
+    downloadJson(buildSherlockExportPackage(artifact), `${item.sourceReportId ?? item.id}-sherlock-redacted-export.json`)
+  }
+
   return (
     <main className="h-full min-w-0 flex-1 overflow-y-auto bg-[#F5F1EA] text-[#111827] dark:bg-[#050505] dark:text-white">
       <section className="mx-auto max-w-[1220px] px-8 py-10">
@@ -296,7 +329,12 @@ export default function StudentCollectionsPage() {
 
         <motion.div layout className="mt-10 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
           {visibleItems.map((item) => (
-            <CollectionCard key={item.id} item={item} />
+            <CollectionCard
+              key={item.id}
+              item={item}
+              onDeleteSherlockReport={handleDeleteSherlockReport}
+              onExportSherlockReport={handleExportSherlockReport}
+            />
           ))}
         </motion.div>
       </section>
@@ -304,7 +342,15 @@ export default function StudentCollectionsPage() {
   )
 }
 
-function CollectionCard({ item }: { item: CollectionItem }) {
+function CollectionCard({
+  item,
+  onDeleteSherlockReport,
+  onExportSherlockReport,
+}: {
+  item: CollectionItem
+  onDeleteSherlockReport: (item: CollectionItem) => void
+  onExportSherlockReport: (item: CollectionItem) => void
+}) {
   const Icon = item.kind === "profile" ? UserRound : item.kind === "job" ? BriefcaseBusiness : item.kind === "roadmap" ? MapIcon : SearchCheck
   const tone =
     item.kind === "profile"
@@ -407,6 +453,27 @@ function CollectionCard({ item }: { item: CollectionItem }) {
           <span>{item.highlight ?? item.meta}</span>
         </div>
       </div>
+
+      {item.kind === "sherlock_report" ? (
+        <div className="mt-5 grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => onExportSherlockReport(item)}
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[#D8DDE8] text-[11px] font-black uppercase tracking-[0.12em] text-[#1F2A38] transition hover:bg-[#E8ECF4]"
+          >
+            <Download size={14} />
+            Export
+          </button>
+          <button
+            type="button"
+            onClick={() => onDeleteSherlockReport(item)}
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[#F2C6C2] text-[11px] font-black uppercase tracking-[0.12em] text-[#A5342E] transition hover:bg-[#FFF0EF]"
+          >
+            <Trash2 size={14} />
+            Delete
+          </button>
+        </div>
+      ) : null}
 
       <div className="mt-auto border-t border-[#E4DCD2] pt-5 dark:border-white/10">
         <Link
@@ -567,14 +634,7 @@ function loadStoredItems(): CollectionItem[] {
       description?: string
       tags?: string[]
       href?: string
-      artifact?: {
-        summary?: {
-          verified?: number
-          contradicted?: number
-          needsAlternativeProof?: number
-        }
-        targetRole?: string
-      }
+      artifact?: SherlockArtifactEnvelope
     }>
 
     savedSherlockReports.forEach((report, index) => {
@@ -599,6 +659,8 @@ function loadStoredItems(): CollectionItem[] {
         status: report.artifact?.targetRole ?? "Human review",
         lastOpened: "Saved now",
         highlight: "No score, no ranking",
+        sourceReportId: report.id,
+        artifact: report.artifact,
       })
     })
   } catch {
@@ -679,4 +741,28 @@ function formatSavedDate(value?: string) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return "Saved now"
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
+}
+
+function removeStoredSherlockReport(reportId: string) {
+  try {
+    const key = "sherlock-saved-reports-v1"
+    const savedSherlockReports = JSON.parse(localStorage.getItem(key) || "[]") as Array<{ id?: string }>
+    localStorage.setItem(key, JSON.stringify(savedSherlockReports.filter((report) => report.id !== reportId)))
+  } catch {
+    // Ignore malformed local report storage.
+  }
+}
+
+function downloadJson(value: unknown, filename: string) {
+  const blob = new Blob([JSON.stringify(value, null, 2)], { type: "application/json" })
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement("a")
+  anchor.href = url
+  anchor.download = filename
+  anchor.click()
+  URL.revokeObjectURL(url)
+}
+
+function isUuid(value: string | undefined) {
+  return Boolean(value && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i.test(value))
 }

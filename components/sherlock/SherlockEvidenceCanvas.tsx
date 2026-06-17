@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import type { ElementType, ReactNode } from "react"
 import { motion } from "framer-motion"
 import {
@@ -8,6 +8,8 @@ import {
   Archive,
   BookOpenCheck,
   CheckCircle2,
+  ClipboardList,
+  Copy,
   Clock3,
   Database,
   Download,
@@ -22,6 +24,15 @@ import {
   ShieldCheck,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import {
+  buildCandidateDisclosure,
+  buildSherlockAuditTrail,
+  buildSherlockExportPackage,
+  candidateDisclosureTemplate,
+  SHERLOCK_RETENTION_DAYS,
+  sourcePolicyCopy,
+  type SherlockAuditEntry,
+} from "@/lib/sherlock/compliance"
 import type {
   SherlockArtifactEnvelope,
   SherlockClaim,
@@ -31,7 +42,7 @@ import type {
   SherlockVerificationState,
 } from "@/lib/sherlock/types"
 
-type ArtifactTab = "overview" | "claims" | "github" | "timeline" | "contradictions" | "interview" | "dossier" | "report"
+type ArtifactTab = "overview" | "claims" | "github" | "timeline" | "contradictions" | "interview" | "dossier" | "report" | "trust"
 export type SherlockSourceStatus = {
   collector: string
   status: "completed" | "skipped" | "failed"
@@ -48,6 +59,7 @@ const tabs: Array<{ id: ArtifactTab; label: string; icon: ElementType }> = [
   { id: "interview", label: "Interview Pack", icon: MessageSquareText },
   { id: "dossier", label: "Evidence Dossier", icon: Archive },
   { id: "report", label: "Share Report", icon: Share2 },
+  { id: "trust", label: "Trust Controls", icon: ClipboardList },
 ]
 
 const stateLabels: Record<SherlockVerificationState, string> = {
@@ -86,10 +98,47 @@ export function SherlockEvidenceCanvas({
 }) {
   const [activeTab, setActiveTab] = useState<ArtifactTab>("overview")
   const [saved, setSaved] = useState(false)
+  const [humanNotes, setHumanNotes] = useState<Record<string, string>>({})
+  const [persistedAudit, setPersistedAudit] = useState<SherlockAuditEntry[]>([])
+  const [copiedDisclosure, setCopiedDisclosure] = useState(false)
 
   const verificationByClaim = useMemo(() => {
     return new Map(artifact.verifications.map((verification) => [verification.claimId, verification]))
   }, [artifact.verifications])
+
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(window.localStorage.getItem("sherlock-audit-notes-v1") || "{}") as Record<string, Record<string, string>>
+      setHumanNotes(stored[artifact.sessionId] ?? {})
+    } catch {
+      setHumanNotes({})
+    }
+  }, [artifact.sessionId])
+
+  useEffect(() => {
+    if (!isUuid(artifact.sessionId)) {
+      setPersistedAudit([])
+      return
+    }
+
+    let cancelled = false
+    fetch(`/api/sherlock/audit?sessionId=${encodeURIComponent(artifact.sessionId)}`)
+      .then((response) => response.json())
+      .then((result: { ok?: boolean; auditLog?: SherlockAuditEntry[] }) => {
+        if (!cancelled && result.ok && result.auditLog?.length) setPersistedAudit(result.auditLog)
+      })
+      .catch(() => {
+        if (!cancelled) setPersistedAudit([])
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [artifact.sessionId, artifact.auditRefs.length])
+
+  const auditTrail = useMemo(() => {
+    return mergeAuditEntries(persistedAudit, buildSherlockAuditTrail(artifact, humanNotes))
+  }, [artifact, humanNotes, persistedAudit])
 
   async function handleSave() {
     const fallbackItem = buildLocalStorageItem(artifact)
@@ -140,6 +189,47 @@ export function SherlockEvidenceCanvas({
     window.localStorage.setItem(key, JSON.stringify(next))
   }
 
+  function handleExport() {
+    downloadJson(buildSherlockExportPackage(artifact, humanNotes), `${artifact.sessionId}-sherlock-redacted-export.json`)
+  }
+
+  async function handleCopyDisclosure() {
+    const disclosure = buildCandidateDisclosure(artifact)
+    await navigator.clipboard.writeText(`${disclosure.title}\n\n${disclosure.text}`)
+    setCopiedDisclosure(true)
+    window.setTimeout(() => setCopiedDisclosure(false), 1600)
+  }
+
+  function handleNoteChange(entryId: string, note: string) {
+    setHumanNotes((previous) => ({ ...previous, [entryId]: note }))
+  }
+
+  async function handleSaveHumanNote(entryId: string) {
+    const note = humanNotes[entryId] ?? ""
+    try {
+      const stored = JSON.parse(window.localStorage.getItem("sherlock-audit-notes-v1") || "{}") as Record<string, Record<string, string>>
+      window.localStorage.setItem(
+        "sherlock-audit-notes-v1",
+        JSON.stringify({
+          ...stored,
+          [artifact.sessionId]: {
+            ...(stored[artifact.sessionId] ?? {}),
+            [entryId]: note,
+          },
+        }),
+      )
+    } catch {
+      // Local audit notes are a convenience control; ignore storage failures.
+    }
+
+    if (!isUuid(artifact.sessionId)) return
+    await fetch("/api/sherlock/audit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId: artifact.sessionId, auditEntryId: entryId, note }),
+    }).catch(() => undefined)
+  }
+
   return (
     <motion.section
       initial={{ opacity: 0, y: 14 }}
@@ -168,6 +258,14 @@ export function SherlockEvidenceCanvas({
             >
               <Save size={15} />
               {saved ? "Saved" : "Save"}
+            </button>
+            <button
+              type="button"
+              onClick={handleExport}
+              className="inline-flex h-11 shrink-0 items-center gap-2 rounded-full border border-[#DED4C7] bg-[#FFFDF8]/80 px-5 text-[11px] font-black uppercase tracking-[0.18em] text-[#4F4842] transition hover:border-[#FF6A00]/40 hover:text-[#FF6A00] dark:border-white/10 dark:bg-white/[0.04] dark:text-white/55"
+            >
+              <Download size={15} />
+              Export
             </button>
           </div>
 
@@ -255,6 +353,18 @@ export function SherlockEvidenceCanvas({
           {activeTab === "interview" && <InterviewPack artifact={artifact} />}
           {activeTab === "dossier" && <EvidenceDossier artifact={artifact} />}
           {activeTab === "report" && <ShareableReport artifact={artifact} />}
+          {activeTab === "trust" && (
+            <TrustControls
+              artifact={artifact}
+              auditTrail={auditTrail}
+              humanNotes={humanNotes}
+              copiedDisclosure={copiedDisclosure}
+              onCopyDisclosure={handleCopyDisclosure}
+              onExport={handleExport}
+              onNoteChange={handleNoteChange}
+              onSaveHumanNote={handleSaveHumanNote}
+            />
+          )}
         </div>
       </div>
     </motion.section>
@@ -424,6 +534,167 @@ function ShareableReport({ artifact }: { artifact: SherlockArtifactEnvelope }) {
         </div>
       </Panel>
     </div>
+  )
+}
+
+function TrustControls({
+  artifact,
+  auditTrail,
+  humanNotes,
+  copiedDisclosure,
+  onCopyDisclosure,
+  onExport,
+  onNoteChange,
+  onSaveHumanNote,
+}: {
+  artifact: SherlockArtifactEnvelope
+  auditTrail: SherlockAuditEntry[]
+  humanNotes: Record<string, string>
+  copiedDisclosure: boolean
+  onCopyDisclosure: () => void
+  onExport: () => void
+  onNoteChange: (entryId: string, note: string) => void
+  onSaveHumanNote: (entryId: string) => void
+}) {
+  const disclosure = buildCandidateDisclosure(artifact)
+  const retentionDays = Number.isFinite(SHERLOCK_RETENTION_DAYS) ? SHERLOCK_RETENTION_DAYS : 30
+
+  return (
+    <div className="mx-auto max-w-[1180px] space-y-6">
+      <section className="grid grid-cols-[0.95fr_1.05fr] gap-6">
+        <Panel title="Trust posture" icon={ShieldCheck}>
+          <div className="grid grid-cols-2 gap-3">
+            <TrustFlag label="Output mode" value="Evidence only" />
+            <TrustFlag label="Human step" value="Decision required" />
+            <TrustFlag label="Retention" value={`${retentionDays} days`} />
+            <TrustFlag label="Redaction" value="Export enabled" />
+          </div>
+          <div className="mt-5 rounded-[20px] border border-[#DED4C7] bg-[#FFFDF8]/70 p-4 dark:border-white/10 dark:bg-white/[0.04]">
+            <p className="text-[13px] font-bold leading-6 text-[#5F564D] dark:text-white/60">
+              Reports contain claim states, cited artifacts, source policy, audit references, and human notes. They do not contain a score, ranking, or automated decision.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onExport}
+            className="mt-5 inline-flex h-10 items-center gap-2 rounded-full border border-[#DED4C7] bg-[#FFFDF8]/80 px-4 text-[11px] font-black uppercase tracking-[0.14em] text-[#4F4842] transition hover:border-[#FF6A00]/40 hover:text-[#FF6A00] dark:border-white/10 dark:bg-white/[0.04] dark:text-white/55"
+          >
+            <Download size={14} />
+            Export redacted report
+          </button>
+        </Panel>
+
+        <Panel title="Candidate disclosure" icon={FileText}>
+          <div className="rounded-[20px] border border-[#DED4C7] bg-[#FFFDF8]/75 p-5 dark:border-white/10 dark:bg-white/[0.04]">
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[18px] font-black tracking-[-0.04em] text-[#2A2520] dark:text-white">{disclosure.title}</p>
+                <p className="mt-1 text-[11px] font-black uppercase tracking-[0.16em] text-[#8A8177] dark:text-white/35">
+                  Generated {new Date(disclosure.generatedAt).toLocaleString()}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={onCopyDisclosure}
+                className="inline-flex h-9 shrink-0 items-center gap-2 rounded-full border border-[#DED4C7] px-3 text-[10px] font-black uppercase tracking-[0.12em] text-[#4F4842] transition hover:border-[#FF6A00]/40 hover:text-[#FF6A00] dark:border-white/10 dark:text-white/55"
+              >
+                <Copy size={13} />
+                {copiedDisclosure ? "Copied" : "Copy"}
+              </button>
+            </div>
+            <pre className="whitespace-pre-wrap font-mono text-[12px] font-bold leading-6 text-[#5F564D] dark:text-white/60">
+              {candidateDisclosureTemplate}
+            </pre>
+          </div>
+        </Panel>
+      </section>
+
+      <Panel title="Source policy" icon={Database}>
+        <div className="grid grid-cols-2 gap-4">
+          {sourcePolicyCopy.map((item) => (
+            <div key={item.source} className="rounded-[20px] border border-[#DED4C7] bg-[#FFFDF8]/75 p-4 dark:border-white/10 dark:bg-white/[0.04]">
+              <div className="flex items-start justify-between gap-3">
+                <p className="text-[15px] font-black leading-5 tracking-[-0.03em] text-[#2A2520] dark:text-white">{item.source}</p>
+                <span
+                  className={cn(
+                    "shrink-0 rounded-full border px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.1em]",
+                    item.status === "allowed"
+                      ? "border-[#A8E8C8] bg-[#E7F8EF] text-[#12633D] dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-200"
+                      : item.status === "restricted"
+                        ? "border-[#FFD8A8] bg-[#FFF5E7] text-[#8A520C] dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-200"
+                        : "border-[#FFC7C3] bg-[#FFF0EF] text-[#A5342E] dark:border-red-400/20 dark:bg-red-400/10 dark:text-red-200",
+                  )}
+                >
+                  {item.status.replaceAll("_", " ")}
+                </span>
+              </div>
+              <p className="mt-3 text-[12px] font-bold leading-5 text-[#6F675F] dark:text-white/55">{item.copy}</p>
+            </div>
+          ))}
+        </div>
+      </Panel>
+
+      <Panel title="Audit log" icon={ClipboardList}>
+        <div className="space-y-4">
+          {auditTrail.map((entry) => (
+            <div key={entry.id} className="rounded-[20px] border border-[#DED4C7] bg-[#FFFDF8]/75 p-5 dark:border-white/10 dark:bg-white/[0.04]">
+              <div className="grid grid-cols-[160px_1fr_150px] gap-4">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#8A8177] dark:text-white/35">Time</p>
+                  <p className="mt-2 text-[12px] font-black text-[#2A2520] dark:text-white">{formatAuditTime(entry.time)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#8A8177] dark:text-white/35">
+                    {entry.actor} - {entry.event.replaceAll("_", " ")}
+                  </p>
+                  <p className="mt-2 text-[14px] font-black leading-5 tracking-[-0.03em] text-[#2A2520] dark:text-white">{entry.source}</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {entry.collector ? <AuditPill label={entry.collector} /> : null}
+                    {entry.modelPromptVersion ? <AuditPill label={entry.modelPromptVersion} /> : null}
+                    {entry.evidenceIds.map((id) => (
+                      <AuditPill key={id} label={id} />
+                    ))}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#8A8177] dark:text-white/35">Human notes</p>
+                  <button
+                    type="button"
+                    onClick={() => onSaveHumanNote(entry.id)}
+                    className="mt-2 inline-flex h-8 items-center rounded-full border border-[#DED4C7] px-3 text-[10px] font-black uppercase tracking-[0.12em] text-[#4F4842] transition hover:border-[#FF6A00]/40 hover:text-[#FF6A00] dark:border-white/10 dark:text-white/55"
+                  >
+                    Save note
+                  </button>
+                </div>
+              </div>
+              <textarea
+                value={humanNotes[entry.id] ?? ""}
+                onChange={(event) => onNoteChange(entry.id, event.target.value)}
+                placeholder="Add human review note for this audit event."
+                className="mt-4 min-h-[74px] w-full resize-y rounded-[16px] border border-[#DED4C7] bg-[#FBF7EF] px-4 py-3 text-[12px] font-bold leading-5 text-[#4F4842] outline-none transition placeholder:text-[#9C9288] focus:border-[#FF6A00]/50 dark:border-white/10 dark:bg-black/20 dark:text-white/70 dark:placeholder:text-white/25"
+              />
+            </div>
+          ))}
+        </div>
+      </Panel>
+    </div>
+  )
+}
+
+function TrustFlag({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[18px] border border-[#DED4C7] bg-[#FFFDF8]/70 p-4 dark:border-white/10 dark:bg-white/[0.04]">
+      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#8A8177] dark:text-white/35">{label}</p>
+      <p className="mt-2 text-[15px] font-black tracking-[-0.04em] text-[#2A2520] dark:text-white">{value}</p>
+    </div>
+  )
+}
+
+function AuditPill({ label }: { label: string }) {
+  return (
+    <span className="rounded-full bg-[#EEE8DF] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.1em] text-[#6F675F] dark:bg-white/10 dark:text-white/50">
+      {label}
+    </span>
   )
 }
 
@@ -708,4 +979,30 @@ function EvidenceLinks({ ids, emptyLabel = "No evidence linked." }: { ids: strin
       ))}
     </div>
   )
+}
+
+function downloadJson(value: unknown, filename: string) {
+  const blob = new Blob([JSON.stringify(value, null, 2)], { type: "application/json" })
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement("a")
+  anchor.href = url
+  anchor.download = filename
+  anchor.click()
+  URL.revokeObjectURL(url)
+}
+
+function mergeAuditEntries(primary: SherlockAuditEntry[], fallback: SherlockAuditEntry[]) {
+  const byId = new Map<string, SherlockAuditEntry>()
+  ;[...fallback, ...primary].forEach((entry) => byId.set(entry.id, entry))
+  return Array.from(byId.values()).sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
+}
+
+function formatAuditTime(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
+}
+
+function isUuid(value: string | undefined) {
+  return Boolean(value && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i.test(value))
 }

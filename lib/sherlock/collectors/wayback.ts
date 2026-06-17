@@ -1,11 +1,33 @@
 import type { SherlockEvidence } from "../types"
-import { fetchJsonWithTimeout } from "../collector-utils"
+import { fetchJsonWithTimeout, validateSourceUrl } from "../collector-utils"
 
 type CdxRow = [string, string, string, string, string]
 
 export async function collectWayback(url: string): Promise<SherlockEvidence[]> {
+  const targetValidation = await validateSourceUrl(url)
+  if (!targetValidation.ok) {
+    const retrievedAt = new Date().toISOString()
+    return [
+      {
+        id: `ev-wayback-blocked-${hashUrl(url)}`,
+        sourceType: "third_party_context",
+        sourceName: "Wayback Machine",
+        sourceUrl: url,
+        retrievedAt,
+        summary: "Wayback lookup was blocked by source safety policy.",
+        details: [targetValidation.error],
+        reliability: "third_party_context",
+        normalizedJson: { url, blocked: true, error: targetValidation.error },
+      },
+    ]
+  }
+
   const sourceUrl = `https://web.archive.org/cdx?url=${encodeURIComponent(url)}&output=json&limit=3&fl=timestamp,original,statuscode,mimetype,digest&filter=statuscode:200&collapse=digest`
-  const result = await fetchJsonWithTimeout<Array<string[]>>(sourceUrl, { rateLimitKey: "wayback", rateLimit: 12 })
+  const result = await fetchJsonWithTimeout<Array<string[]>>(sourceUrl, {
+    rateLimitKey: "wayback",
+    rateLimit: 12,
+    allowedHostnames: ["web.archive.org"],
+  })
   if (!result.ok) {
     return [
       {

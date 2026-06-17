@@ -41,7 +41,11 @@ type CratesPackage = {
 
 export async function collectNpmPackage(packageName: string): Promise<SherlockEvidence[]> {
   const url = `https://registry.npmjs.org/${encodeURIComponent(packageName)}`
-  const result = await fetchJsonWithTimeout<NpmPackage>(url, { rateLimitKey: "npm", rateLimit: 20 })
+  const result = await fetchJsonWithTimeout<NpmPackage>(url, {
+    rateLimitKey: "npm",
+    rateLimit: 20,
+    allowedHostnames: ["registry.npmjs.org"],
+  })
   if (!result.ok) return [packageErrorEvidence("npm", packageName, url, result.error, result.retrievedAt)]
 
   const versions = Object.keys(result.data.versions ?? {})
@@ -80,7 +84,11 @@ export async function collectNpmPackage(packageName: string): Promise<SherlockEv
 
 export async function collectPyPiPackage(packageName: string): Promise<SherlockEvidence[]> {
   const url = `https://pypi.org/pypi/${encodeURIComponent(packageName)}/json`
-  const result = await fetchJsonWithTimeout<PyPiPackage>(url, { rateLimitKey: "pypi", rateLimit: 20 })
+  const result = await fetchJsonWithTimeout<PyPiPackage>(url, {
+    rateLimitKey: "pypi",
+    rateLimit: 20,
+    allowedHostnames: ["pypi.org"],
+  })
   if (!result.ok) return [packageErrorEvidence("PyPI", packageName, url, result.error, result.retrievedAt)]
 
   const releases = Object.entries(result.data.releases ?? {})
@@ -116,7 +124,11 @@ export async function collectPyPiPackage(packageName: string): Promise<SherlockE
 
 export async function collectCrate(packageName: string): Promise<SherlockEvidence[]> {
   const url = `https://crates.io/api/v1/crates/${encodeURIComponent(packageName)}`
-  const result = await fetchJsonWithTimeout<CratesPackage>(url, { rateLimitKey: "crates", rateLimit: 20 })
+  const result = await fetchJsonWithTimeout<CratesPackage>(url, {
+    rateLimitKey: "crates",
+    rateLimit: 20,
+    allowedHostnames: ["crates.io"],
+  })
   if (!result.ok) return [packageErrorEvidence("crates.io", packageName, url, result.error, result.retrievedAt)]
 
   const crate = result.data.crate
