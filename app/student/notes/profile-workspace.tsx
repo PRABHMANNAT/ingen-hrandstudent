@@ -105,6 +105,14 @@ export default function ProfileWorkspace({
   initialChat: ChatMessageRow[]
   linkedInIdentity: LinkedInIdentity
 }) {
+  const projectSections = profile.sections.filter((s) => s.type === "projects")
+  const pitchSection = profile.sections.find((s) => s.type === "gallery")
+  const endorsementItems = profile.sections
+    .filter((s) => s.type === "endorsements" || s.type === "social-work")
+    .flatMap((s) => s.items)
+  // Accordion holds everything that isn't already surfaced as a featured band.
+  const accordionSections = profile.sections.filter((s) => s.type !== "projects")
+
   return (
     <main className="flex h-full min-w-0 flex-1 overflow-hidden bg-[#FAF7F2] font-normal text-[#1F1B17] dark:bg-[#070707] dark:text-white">
       <AristotlePanel profile={profile} initialChat={initialChat} />
@@ -113,24 +121,39 @@ export default function ProfileWorkspace({
         <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(36,31,24,0.025)_1px,transparent_1px),linear-gradient(90deg,rgba(36,31,24,0.025)_1px,transparent_1px)] bg-[size:32px_32px] dark:bg-[linear-gradient(rgba(255,255,255,0.015)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.015)_1px,transparent_1px)]" />
 
         <div className="relative h-full overflow-y-auto px-6 py-6">
-          <div className="mx-auto w-full max-w-[760px] pb-12">
+          <div className="mx-auto flex w-full max-w-[820px] flex-col gap-4 pb-12">
             <Toolbar profile={profile} linkedInIdentity={linkedInIdentity} />
-            <HeaderBlock profile={profile} />
+            <HeroIdentityStrip profile={profile} />
+            <PitchReel profile={profile} pitchSection={pitchSection} />
+            <MetricsStrip profile={profile} />
+            {projectSections.length > 0 && <FeaturedWorkCarousel sections={projectSections} />}
+            <EndorsementsAndInsights profile={profile} items={endorsementItems} />
 
-            <div className="mt-5 flex flex-col gap-4">
-              {profile.sections.length === 0 && (
-                <div className="rounded-2xl border border-dashed border-[#E3DACD] px-6 py-10 text-center dark:border-white/10">
-                  <LayoutGrid size={20} className="mx-auto text-[#A89D91] dark:text-white/25" />
-                  <h2 className="mt-3 text-[13px] font-semibold text-[#1F1B17] dark:text-white">No sections yet</h2>
-                  <p className="mx-auto mt-1 max-w-md text-[12px] font-normal leading-5 text-[#7B7269] dark:text-white/50">
-                    Ask Aristotle to build one from your resume, or add a section manually below.
-                  </p>
+            {profile.sections.length === 0 && (
+              <div className="rounded-2xl border border-dashed border-[#E3DACD] px-6 py-10 text-center dark:border-white/10">
+                <LayoutGrid size={20} className="mx-auto text-[#A89D91] dark:text-white/25" />
+                <h2 className="mt-3 text-[13px] font-semibold text-[#1F1B17] dark:text-white">No sections yet</h2>
+                <p className="mx-auto mt-1 max-w-md text-[12px] font-normal leading-5 text-[#7B7269] dark:text-white/50">
+                  Ask Aristotle to build one from your resume, or add a section manually below.
+                </p>
+              </div>
+            )}
+
+            {accordionSections.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between pl-1">
+                  <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#A89D91] dark:text-white/40">
+                    Everything else
+                  </h2>
+                  <span className="text-[10px] font-medium text-[#A89D91] dark:text-white/40">
+                    {accordionSections.length} sections · click to expand
+                  </span>
                 </div>
-              )}
-              {profile.sections.map((section) => (
-                <SectionCard key={section.id} section={section} />
-              ))}
-            </div>
+                {accordionSections.map((section) => (
+                  <AccordionSection key={section.id} section={section} />
+                ))}
+              </div>
+            )}
 
             <AddSectionForm />
           </div>
@@ -453,8 +476,8 @@ function AvatarUploader({ profile }: { profile: FullProfile }) {
   )
 }
 
-// --- Fixed header block -----------------------------------------------------
-function HeaderBlock({ profile }: { profile: FullProfile }) {
+// --- Hero identity strip (replaces the old LinkedIn-style header block) -----
+function HeroIdentityStrip({ profile }: { profile: FullProfile }) {
   const [editing, setEditing] = useState(false)
   const [pending, start] = useTransition()
   const [form, setForm] = useState({
@@ -489,88 +512,533 @@ function HeaderBlock({ profile }: { profile: FullProfile }) {
     })
   }
 
+  const allProofs = profile.sections.flatMap((s) => s.items).flatMap((i) => i.proofs)
+  const hasVerifiedProofs = allProofs.some((p) => p.status === "verified")
+  const topSkills = profile.tags.slice(0, 3)
+
+  // Pull school + grad date from the first education item if present.
+  const eduSection = profile.sections.find((s) => s.type === "education")
+  const topEdu = eduSection?.items[0]
+  const eduMeta = (topEdu?.meta ?? {}) as ItemMeta
+  const schoolLine = topEdu
+    ? [
+        eduMeta.school || splitTitle(topEdu.title)[0],
+        eduMeta.degree,
+        eduMeta.end ? `Graduating ${formatYM(eduMeta.end)}` : "",
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    : profile.headline
+
   return (
-    <section className="mt-4 overflow-hidden rounded-2xl border border-[#E8E0D2] bg-white p-5 shadow-[0_1px_2px_rgba(31,27,23,0.04)] dark:border-white/10 dark:bg-[#0E0E0E]">
-      <div className="flex items-start gap-4">
-        <AvatarUploader profile={profile} />
-
-        <div className="min-w-0 flex-1">
-          {!editing ? (
-            <>
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <h1 className="truncate text-lg font-bold tracking-tight text-[#1F1B17] dark:text-white">
-                    {profile.full_name || "Your name"}
-                  </h1>
-                  <p className="mt-0.5 text-[13px] font-medium text-[#7B7269] dark:text-white/55">
-                    {profile.headline || "Add a headline — your role focus in one line"}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={beginEdit}
-                  className="inline-flex shrink-0 items-center gap-1 rounded-md border border-[#E8E0D2] bg-white px-2.5 py-1.5 text-[10px] font-semibold text-[#7B7269] transition hover:border-[#7C5CFF]/45 hover:text-[#6B4EF6] dark:border-white/10 dark:bg-white/[0.04] dark:text-white/50"
-                >
-                  <Pencil size={11} /> Edit
-                </button>
+    <section className="overflow-hidden rounded-2xl border border-[#E8E0D2] bg-white p-5 shadow-[0_1px_2px_rgba(31,27,23,0.04)] dark:border-white/10 dark:bg-[#0E0E0E]">
+      {!editing ? (
+        <div className="flex items-start gap-4">
+          <AvatarUploader profile={profile} />
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-lg font-bold tracking-tight text-[#1F1B17] dark:text-white">
+                {profile.full_name || "Your name"}
+              </h1>
+              {hasVerifiedProofs && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-300">
+                  <BadgeCheck size={11} /> verified by Aristotle
+                </span>
+              )}
+            </div>
+            <p className="mt-0.5 text-[12px] font-normal text-[#7B7269] dark:text-white/55">
+              {schoolLine || "Add a headline — your role focus in one line"}
+            </p>
+            {topSkills.length > 0 && (
+              <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                {topSkills.map((tag) => (
+                  <span
+                    key={tag}
+                    className="inline-flex items-center gap-1 rounded-full bg-[#F3EFFF] px-2.5 py-0.5 text-[11px] font-semibold text-[#6B4EF6] dark:bg-[#7C5CFF]/15 dark:text-[#C9BEFF]"
+                  >
+                    <Sparkles size={9} /> {tag}
+                  </span>
+                ))}
+                <span className="text-[10px] font-medium text-[#A89D91] dark:text-white/40">
+                  top skills, proof-backed
+                </span>
               </div>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={beginEdit}
+            className="inline-flex shrink-0 items-center gap-1 rounded-md border border-[#E8E0D2] bg-white px-2.5 py-1.5 text-[10px] font-semibold text-[#7B7269] transition hover:border-[#7C5CFF]/45 hover:text-[#6B4EF6] dark:border-white/10 dark:bg-white/[0.04] dark:text-white/50"
+          >
+            <Pencil size={11} /> Edit
+          </button>
+        </div>
+      ) : (
+        <div className="flex items-start gap-4">
+          <AvatarUploader profile={profile} />
+          <div className="min-w-0 flex-1 space-y-3">
+            <EditField label="Full name" value={form.full_name} onChange={(v) => setForm({ ...form, full_name: v })} />
+            <EditField label="Headline / tagline (shown in pitch reel)" value={form.headline} onChange={(v) => setForm({ ...form, headline: v })} placeholder='e.g. "I build distributed systems that scale to 100k+ RPS."' />
+            <EditField label="Target role" value={form.target_role} onChange={(v) => setForm({ ...form, target_role: v })} placeholder="Backend Engineer" />
+            <EditField label="Top skills (first 3 shown as pills)" value={form.tags} onChange={(v) => setForm({ ...form, tags: v })} placeholder="TypeScript, Kubernetes, Distributed systems" />
+            <div>
+              <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-[#7B7269] dark:text-white/45">About</span>
+              <textarea
+                value={form.about}
+                onChange={(e) => setForm({ ...form, about: e.target.value })}
+                rows={3}
+                placeholder="A short note about you."
+                className="w-full resize-none rounded-lg border border-[#E8E0D2] bg-white px-3 py-2 text-[13px] font-normal text-[#1F1B17] outline-none focus:border-[#7C5CFF]/50 focus:ring-2 focus:ring-[#7C5CFF]/15 dark:border-white/10 dark:bg-[#141414] dark:text-white"
+              />
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={save}
+                disabled={pending}
+                className="inline-flex items-center gap-1 rounded-md bg-[#7C5CFF] px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm transition hover:bg-[#684AF0] disabled:opacity-50"
+              >
+                {pending ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />} Save
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditing(false)}
+                disabled={pending}
+                className="inline-flex items-center gap-1 rounded-md border border-[#E8E0D2] px-3 py-1.5 text-[11px] font-semibold text-[#7B7269] transition hover:bg-[#1F1B17]/5 disabled:opacity-50 dark:border-white/10 dark:text-white/50"
+              >
+                <X size={12} /> Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
+  )
+}
 
-              {profile.tags.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  {profile.tags.map((tag) => (
-                    <span
-                      key={tag}
-                      className="rounded-md border border-[#E8E0D2] bg-[#FAF7F2] px-2 py-0.5 text-[10px] font-semibold text-[#5C5249] dark:border-white/10 dark:bg-white/[0.04] dark:text-white/55"
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              )}
+// --- Pitch reel: hero media + tagline, replaces wall-of-text About ----------
+function PitchReel({ profile, pitchSection }: { profile: FullProfile; pitchSection?: SectionWithItems }) {
+  const allImages = pitchSection
+    ? pitchSection.items.flatMap((it) => {
+        const meta = (it.meta ?? {}) as ItemMeta & { images?: string[] }
+        return (meta.images ?? []).map((src) => ({ src, caption: it.title }))
+      })
+    : []
+  const [idx, setIdx] = useState(0)
+  const total = allImages.length
+  const current = total > 0 ? allImages[idx % total] : null
 
-              {profile.about && (
-                <p className="mt-3 text-[13px] font-normal leading-6 text-[#5C5249] dark:text-white/60">{profile.about}</p>
-              )}
+  const tagline =
+    profile.headline ||
+    (profile.about ? profile.about.split(/[.!?]/)[0].trim() : "")
+
+  return (
+    <section className="overflow-hidden rounded-2xl border border-[#E8E0D2] bg-white p-5 shadow-[0_1px_2px_rgba(31,27,23,0.04)] dark:border-white/10 dark:bg-[#0E0E0E]">
+      <div className="flex flex-col gap-4 md:flex-row md:items-stretch">
+        <div className="relative aspect-[16/10] w-full shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-[#1F1B17] to-[#3F362E] md:w-[300px] dark:from-[#0c0c0c] dark:to-[#1a1a1a]">
+          {current ? (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={current.src} alt={current.caption} className="h-full w-full object-cover" />
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent" />
+              <span className="absolute bottom-2 left-2.5 text-[10px] font-semibold text-white/85">
+                {current.caption}
+              </span>
             </>
           ) : (
-            <div className="space-y-3">
-              <EditField label="Full name" value={form.full_name} onChange={(v) => setForm({ ...form, full_name: v })} />
-              <EditField label="Headline" value={form.headline} onChange={(v) => setForm({ ...form, headline: v })} placeholder="Backend Engineer · Distributed Systems" />
-              <EditField label="Target role" value={form.target_role} onChange={(v) => setForm({ ...form, target_role: v })} placeholder="Backend Engineer" />
-              <EditField label="Tags (comma separated)" value={form.tags} onChange={(v) => setForm({ ...form, tags: v })} placeholder="Java, Spring Boot, PostgreSQL" />
-              <div>
-                <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-[#7B7269] dark:text-white/45">About</span>
-                <textarea
-                  value={form.about}
-                  onChange={(e) => setForm({ ...form, about: e.target.value })}
-                  rows={3}
-                  placeholder="A short note about you."
-                  className="w-full resize-none rounded-lg border border-[#E8E0D2] bg-white px-3 py-2 text-[13px] font-normal text-[#1F1B17] outline-none focus:border-[#7C5CFF]/50 focus:ring-2 focus:ring-[#7C5CFF]/15 dark:border-white/10 dark:bg-[#141414] dark:text-white"
-                />
-              </div>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={save}
-                  disabled={pending}
-                  className="inline-flex items-center gap-1 rounded-md bg-[#7C5CFF] px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm transition hover:bg-[#684AF0] disabled:opacity-50"
-                >
-                  {pending ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />} Save
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setEditing(false)}
-                  disabled={pending}
-                  className="inline-flex items-center gap-1 rounded-md border border-[#E8E0D2] px-3 py-1.5 text-[11px] font-semibold text-[#7B7269] transition hover:bg-[#1F1B17]/5 disabled:opacity-50 dark:border-white/10 dark:text-white/50"
-                >
-                  <X size={12} /> Cancel
-                </button>
+            <div className="flex h-full w-full items-center justify-center">
+              <div className="text-center">
+                <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-white/95">
+                  <ImageIcon size={20} className="text-[#1F1B17]" />
+                </div>
+                <p className="mt-2 text-[10px] font-medium uppercase tracking-[0.2em] text-white/70">
+                  Drop a pitch reel
+                </p>
               </div>
             </div>
+          )}
+          {total > 1 && (
+            <>
+              <button
+                type="button"
+                onClick={() => setIdx((i) => (i - 1 + total) % total)}
+                className="absolute left-1.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 text-[14px] font-bold text-[#1F1B17] backdrop-blur-sm transition hover:bg-white"
+                aria-label="Previous"
+              >
+                ‹
+              </button>
+              <button
+                type="button"
+                onClick={() => setIdx((i) => (i + 1) % total)}
+                className="absolute right-1.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 text-[14px] font-bold text-[#1F1B17] backdrop-blur-sm transition hover:bg-white"
+                aria-label="Next"
+              >
+                ›
+              </button>
+              <div className="absolute bottom-2 right-2 rounded-md bg-black/45 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-white/90 backdrop-blur-sm">
+                {idx + 1} / {total}
+              </div>
+            </>
+          )}
+        </div>
+        <div className="flex flex-1 flex-col justify-center">
+          {tagline ? (
+            <blockquote
+              className="text-[17px] font-medium italic leading-[1.45] text-[#1F1B17] dark:text-white"
+              style={{ fontFamily: "Georgia, ui-serif, serif" }}
+            >
+              &ldquo;{tagline}&rdquo;
+            </blockquote>
+          ) : (
+            <p className="text-[13px] font-medium text-[#A89D91] dark:text-white/40">
+              Add a headline — it becomes your tagline here.
+            </p>
+          )}
+          <p className="mt-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#A89D91] dark:text-white/40">
+            {profile.target_role || "Add a target role"}
+          </p>
+          {profile.about && (
+            <p className="mt-3 line-clamp-3 text-[12px] font-normal leading-5 text-[#5C5249] dark:text-white/55">
+              {profile.about}
+            </p>
           )}
         </div>
       </div>
     </section>
+  )
+}
+
+// --- Metrics strip: 4 live-computed tiles -----------------------------------
+function MetricsStrip({ profile }: { profile: FullProfile }) {
+  const allProofs = profile.sections.flatMap((s) => s.items).flatMap((i) => i.proofs)
+
+  const projectsItems = profile.sections.filter((s) => s.type === "projects").flatMap((s) => s.items)
+  const projectsCount = projectsItems.length
+  const projectsWithProof = projectsItems.filter((i) => i.proofs.some((p) => p.status === "verified")).length
+
+  const hackathonItems = profile.sections.filter((s) => s.type === "hackathons").flatMap((s) => s.items)
+  const hackathonCount = hackathonItems.length
+  const topPlace = hackathonItems
+    .map((i) => ((i.meta ?? {}) as ItemMeta).place)
+    .filter((p): p is string => Boolean(p))
+    .sort()[0]
+
+  const githubProofs = allProofs.filter((p) => p.kind === "github" && p.status === "verified")
+  const githubCount = githubProofs.length
+  const totalStars = githubProofs.reduce((acc, p) => {
+    const e = (p.extracted ?? {}) as Record<string, unknown>
+    return acc + (typeof e.stars === "number" ? e.stars : 0)
+  }, 0)
+
+  const verifiedCount = allProofs.filter((p) => p.status === "verified").length
+
+  type Tone = "success" | "info" | "muted"
+  const tiles: {
+    label: string
+    value: number
+    sub: string
+    subTone: Tone
+    icon: React.ComponentType<{ size?: number; className?: string }>
+  }[] = [
+    {
+      label: "Projects",
+      value: projectsCount,
+      sub: projectsWithProof > 0 ? `${projectsWithProof} with proof` : "Add proofs to verify",
+      subTone: projectsWithProof > 0 ? "success" : "muted",
+      icon: Code2,
+    },
+    {
+      label: "Hackathons",
+      value: hackathonCount,
+      sub: topPlace ? `Best: ${topPlace} place` : "Add a win or finalist",
+      subTone: topPlace ? "success" : "muted",
+      icon: Trophy,
+    },
+    {
+      label: "GitHub repos",
+      value: githubCount,
+      sub: totalStars > 0 ? `★ ${totalStars} stars` : githubCount > 0 ? "Verified" : "Connect GitHub proofs",
+      subTone: githubCount > 0 ? "info" : "muted",
+      icon: Github,
+    },
+    {
+      label: "Verified claims",
+      value: verifiedCount,
+      sub: allProofs.length > 0 ? `${verifiedCount} of ${allProofs.length} proofs` : "Add proofs to start",
+      subTone: verifiedCount > 0 ? "success" : "muted",
+      icon: ShieldCheck,
+    },
+  ]
+
+  return (
+    <section className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      {tiles.map((tile) => {
+        const Icon = tile.icon
+        const toneCls =
+          tile.subTone === "success"
+            ? "text-emerald-600 dark:text-emerald-400"
+            : tile.subTone === "info"
+              ? "text-[#6B4EF6] dark:text-[#C9BEFF]"
+              : "text-[#A89D91] dark:text-white/40"
+        return (
+          <div
+            key={tile.label}
+            className="rounded-xl border border-[#E8E0D2] bg-white p-3.5 shadow-[0_1px_2px_rgba(31,27,23,0.04)] dark:border-white/10 dark:bg-[#0E0E0E]"
+          >
+            <div className="flex items-center gap-1.5">
+              <Icon size={12} className="text-[#A89D91] dark:text-white/40" />
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-[#7B7269] dark:text-white/45">
+                {tile.label}
+              </p>
+            </div>
+            <p className="mt-1.5 text-[24px] font-bold leading-none tracking-tight text-[#1F1B17] dark:text-white">
+              {tile.value}
+            </p>
+            <p className={cn("mt-1.5 text-[10px] font-semibold", toneCls)}>{tile.sub}</p>
+          </div>
+        )
+      })}
+    </section>
+  )
+}
+
+// --- Featured work carousel: horizontal scroll, no LinkedIn list ------------
+function FeaturedWorkCarousel({ sections }: { sections: SectionWithItems[] }) {
+  const allItems = sections.flatMap((s) => s.items)
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  function scrollByDir(dir: 1 | -1) {
+    if (!scrollRef.current) return
+    scrollRef.current.scrollBy({ left: dir * 320, behavior: "smooth" })
+  }
+
+  if (allItems.length === 0) return null
+
+  return (
+    <section className="space-y-2.5">
+      <div className="flex items-end justify-between">
+        <div>
+          <h2 className="text-[15px] font-bold tracking-tight text-[#1F1B17] dark:text-white">Featured work</h2>
+          <p className="text-[11px] font-normal text-[#7B7269] dark:text-white/50">
+            {allItems.length} {allItems.length === 1 ? "project" : "projects"}
+            {allItems.length > 2 ? " · swipe for more" : ""}
+          </p>
+        </div>
+        {allItems.length > 2 && (
+          <div className="flex gap-1">
+            <button
+              type="button"
+              onClick={() => scrollByDir(-1)}
+              className="flex h-7 w-7 items-center justify-center rounded-full border border-[#E8E0D2] bg-white text-[14px] font-bold text-[#7B7269] transition hover:border-[#7C5CFF]/45 hover:text-[#6B4EF6] dark:border-white/10 dark:bg-white/[0.04] dark:text-white/50"
+              aria-label="Scroll left"
+            >
+              ‹
+            </button>
+            <button
+              type="button"
+              onClick={() => scrollByDir(1)}
+              className="flex h-7 w-7 items-center justify-center rounded-full border border-[#E8E0D2] bg-white text-[14px] font-bold text-[#7B7269] transition hover:border-[#7C5CFF]/45 hover:text-[#6B4EF6] dark:border-white/10 dark:bg-white/[0.04] dark:text-white/50"
+              aria-label="Scroll right"
+            >
+              ›
+            </button>
+          </div>
+        )}
+      </div>
+      <div
+        ref={scrollRef}
+        className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-2"
+        style={{ scrollSnapType: "x mandatory", scrollbarWidth: "thin" }}
+      >
+        {allItems.map((item) => (
+          <div
+            key={item.id}
+            className="w-[300px] min-w-[300px] shrink-0"
+            style={{ scrollSnapAlign: "start" }}
+          >
+            <ProjectCard item={item} />
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+// --- Endorsements + Insights row --------------------------------------------
+function EndorsementsAndInsights({ profile, items }: { profile: FullProfile; items: ItemRecord[] }) {
+  const internshipCount = profile.sections
+    .filter((s) => s.type === "experience")
+    .flatMap((s) => s.items)
+    .filter((it) => /intern/i.test(((it.meta as ItemMeta)?.role ?? "") + " " + it.title)).length
+
+  const certCount = profile.sections
+    .filter((s) => s.type === "certifications")
+    .flatMap((s) => s.items).length
+
+  const galleryCount = profile.sections
+    .filter((s) => s.type === "gallery")
+    .flatMap((s) => s.items)
+    .flatMap((it) => ((it.meta as ItemMeta & { images?: string[] })?.images ?? [])).length
+
+  const skillsCount = profile.sections
+    .filter((s) => s.type === "skills")
+    .flatMap((s) => s.items)
+    .flatMap((it) =>
+      (it.body || it.title)
+        .split(/[·•·,]/)
+        .map((s) => s.trim())
+        .filter(Boolean),
+    ).length
+
+  return (
+    <section className="grid gap-3 md:grid-cols-[1.4fr_1fr]">
+      <div className="overflow-hidden rounded-2xl border border-[#E8E0D2] bg-white p-4 shadow-[0_1px_2px_rgba(31,27,23,0.04)] dark:border-white/10 dark:bg-[#0E0E0E]">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-[14px] font-bold tracking-tight text-[#1F1B17] dark:text-white">Endorsements</h2>
+          <span className="inline-flex items-center gap-1 rounded-md bg-[#0A66C2]/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[#0A66C2]">
+            <Linkedin size={9} /> verified provenance
+          </span>
+        </div>
+        {items.length === 0 ? (
+          <p className="mt-3 rounded-lg border border-dashed border-[#E8E0D2] px-3 py-3 text-[11px] font-normal text-[#A89D91] dark:border-white/10 dark:text-white/40">
+            No endorsements yet — ask Aristotle to add a quote from a tutor, manager, or teammate.
+          </p>
+        ) : (
+          <div className="mt-2 space-y-2.5">
+            {items.slice(0, 2).map((it) => {
+              const meta = (it.meta ?? {}) as ItemMeta
+              return (
+                <div key={it.id} className="border-l-2 border-[#7C5CFF]/45 pl-3">
+                  <p
+                    className="text-[12px] font-medium italic leading-5 text-[#1F1B17] dark:text-white"
+                    style={{ fontFamily: "Georgia, ui-serif, serif" }}
+                  >
+                    &ldquo;{it.body || it.title}&rdquo;
+                  </p>
+                  <p className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-[#7B7269] dark:text-white/45">
+                    {it.title}
+                    {meta.role ? ` · ${meta.role}` : ""}
+                    {meta.company ? ` · ${meta.company}` : ""}
+                  </p>
+                </div>
+              )
+            })}
+            {items.length > 2 && (
+              <p className="text-[10px] font-medium text-[#A89D91] dark:text-white/40">
+                + {items.length - 2} more
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="overflow-hidden rounded-2xl border border-[#E8E0D2] bg-white p-4 shadow-[0_1px_2px_rgba(31,27,23,0.04)] dark:border-white/10 dark:bg-[#0E0E0E]">
+        <h2 className="text-[14px] font-bold tracking-tight text-[#1F1B17] dark:text-white">Insights</h2>
+        <div className="mt-2.5 space-y-1.5">
+          <InsightRow
+            icon={Briefcase}
+            label={`${internshipCount} ${internshipCount === 1 ? "internship" : "internships"}`}
+            tone={internshipCount > 0 ? "success" : "muted"}
+          />
+          <InsightRow
+            icon={BadgeCheck}
+            label={`${certCount} ${certCount === 1 ? "certification" : "certifications"}`}
+            tone={certCount > 0 ? "info" : "muted"}
+          />
+          <InsightRow icon={Sparkles} label={`${skillsCount} skills listed`} tone={skillsCount > 0 ? "info" : "muted"} />
+          <InsightRow icon={ImageIcon} label={`${galleryCount} event photos`} tone={galleryCount > 0 ? "muted" : "muted"} />
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function InsightRow({
+  icon: Icon,
+  label,
+  tone,
+}: {
+  icon: React.ComponentType<{ size?: number; className?: string }>
+  label: string
+  tone: "success" | "info" | "muted"
+}) {
+  const iconCls =
+    tone === "success"
+      ? "text-emerald-600 dark:text-emerald-400"
+      : tone === "info"
+        ? "text-[#6B4EF6] dark:text-[#C9BEFF]"
+        : "text-[#A89D91] dark:text-white/45"
+  return (
+    <div className="flex items-center gap-2">
+      <Icon size={14} className={iconCls} />
+      <span className="text-[12px] font-medium text-[#1F1B17] dark:text-white">{label}</span>
+    </div>
+  )
+}
+
+// --- Accordion section: collapsed wrapper around SectionBody ----------------
+function AccordionSection({ section }: { section: SectionWithItems }) {
+  const [open, setOpen] = useState(false)
+  const [adding, setAdding] = useState(false)
+  const [pending, start] = useTransition()
+  const Icon = SECTION_ICON[section.type] ?? LayoutGrid
+  const count = section.items.length
+
+  return (
+    <div className="overflow-hidden rounded-2xl border border-[#E8E0D2] bg-white shadow-[0_1px_2px_rgba(31,27,23,0.04)] dark:border-white/10 dark:bg-[#0E0E0E]">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center gap-3 px-4 py-3 transition hover:bg-[#FAF7F2] dark:hover:bg-white/[0.02]"
+      >
+        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#F3EFFF] text-[#6B4EF6] dark:bg-[#7C5CFF]/15 dark:text-[#C9BEFF]">
+          <Icon size={13} />
+        </div>
+        <div className="flex-1 text-left">
+          <p className="text-[13px] font-bold tracking-tight text-[#1F1B17] dark:text-white">{section.title}</p>
+        </div>
+        <span className="text-[10px] font-medium text-[#A89D91] dark:text-white/40">
+          {count === 0 ? "Empty" : `${count} ${count === 1 ? "item" : "items"}`}
+        </span>
+        <ChevronDown
+          size={14}
+          className={cn("text-[#A89D91] transition dark:text-white/40", open && "rotate-180")}
+        />
+      </button>
+      {open && (
+        <div className="border-t border-[#E8E0D2] px-4 py-4 dark:border-white/10">
+          <div className="mb-3 flex items-center justify-end gap-1">
+            <button
+              type="button"
+              onClick={() => setAdding((v) => !v)}
+              className="inline-flex items-center gap-1 rounded-md border border-[#E8E0D2] bg-white px-2 py-1 text-[10px] font-semibold text-[#7B7269] transition hover:border-[#7C5CFF]/45 hover:text-[#6B4EF6] dark:border-white/10 dark:bg-white/[0.04] dark:text-white/50"
+            >
+              <Plus size={11} /> Item
+            </button>
+            <button
+              type="button"
+              onClick={() => start(() => void deleteSection(section.id))}
+              disabled={pending}
+              className="inline-flex items-center justify-center rounded-md border border-[#E8E0D2] bg-white p-1.5 text-[#7B7269] transition hover:border-red-300 hover:text-red-600 disabled:opacity-50 dark:border-white/10 dark:bg-white/[0.04] dark:text-white/50"
+              aria-label="Delete section"
+            >
+              <Trash2 size={12} />
+            </button>
+          </div>
+          {section.items.length === 0 && !adding && (
+            <p className="rounded-lg border border-dashed border-[#E8E0D2] px-3 py-2.5 text-[11px] font-medium text-[#B7AEA5] dark:border-white/10">
+              No items yet — add one, or ask Aristotle to fill this in.
+            </p>
+          )}
+          {section.items.length > 0 && <SectionBody section={section} />}
+          {adding && (
+            <div className="mt-2">
+              <AddItemForm sectionId={section.id} onDone={() => setAdding(false)} />
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   )
 }
 
